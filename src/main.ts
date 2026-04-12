@@ -205,8 +205,8 @@ function renderSm3Exhibit(): string {
         <label for="sm3-input">Input</label>
         <textarea id="sm3-input">${escapeHtml(state.sm3.input)}</textarea>
         <div class="button-row">
-          <button class="primary" data-focus-result="sm3-result">Hash with SM3</button>
-          <button data-focus-result="sm3-sha-result">Hash with SHA-256</button>
+          <button class="primary" data-rehash="sm3">Hash with SM3</button>
+          <button data-rehash="sm3">Hash with SHA-256</button>
         </div>
         <div id="sm3-result">${hashRow('SM3 (256-bit)', sm3Digest, 'sm3')}</div>
         <div id="sm3-sha-result">${hashRow('SHA-256 (256-bit)', shaDigest, 'sha256')}</div>
@@ -295,6 +295,10 @@ function renderStreebogExhibit(): string {
           <option value="256" ${currentSize === 256 ? 'selected' : ''}>256-bit</option>
           <option value="512" ${currentSize === 512 ? 'selected' : ''}>512-bit</option>
         </select>
+        <div class="button-row">
+          <button class="primary" data-rehash="streebog">Hash with Streebog</button>
+          <button data-rehash="streebog">Hash with ${currentSize === 256 ? 'SHA-256' : 'SHA-512'}</button>
+        </div>
         ${hashRow(`Streebog-${currentSize}`, streebogDigest, `streebog-${currentSize}`)}
         ${hashRow(currentSize === 256 ? 'SHA-256' : 'SHA-512', referenceDigest, `streebog-ref-${currentSize}`)}
       </div>
@@ -302,7 +306,7 @@ function renderStreebogExhibit(): string {
         <h3>Mandatory S-box connection note</h3>
         <div class="callout warn">
           Streebog uses the same S-box as Kuznyechik. In 2019, L\'eo Perrin and co-authors documented hidden structure in that S-box inconsistent
-          with random generation. The same S-box controversy from Kuznyechik applies here. Use Streebog only when Russian compliance requires it.
+          with random generation. The same S-box controversy from Kuznyechik applies here. Use Streebog only when Russian GOST R 34.11-2012 compliance requires it.
         </div>
         <p class="small">
           See the related Kuznyechik discussion in World Ciphers Exhibit 4:
@@ -372,6 +376,10 @@ function renderKupynaExhibit(): string {
           <option value="256" ${currentSize === 256 ? 'selected' : ''}>256-bit</option>
           <option value="512" ${currentSize === 512 ? 'selected' : ''}>512-bit</option>
         </select>
+        <div class="button-row">
+          <button class="primary" data-rehash="kupyna">Hash with Kupyna</button>
+          <button data-rehash="kupyna">Hash with ${currentSize === 256 ? 'SHA-3-256' : 'SHA-3-512'}</button>
+        </div>
         ${hashRow(`Kupyna-${currentSize}`, kupynaDigest, `kupyna-${currentSize}`)}
         ${hashRow(currentSize === 256 ? 'SHA-3-256' : 'SHA-3-512', sha3Digest, `kupyna-ref-${currentSize}`)}
       </div>
@@ -462,6 +470,9 @@ function renderAnchorsExhibit(): string {
         </select>
         <label for="anchors-input">Input</label>
         <textarea id="anchors-input">${escapeHtml(state.anchors.input)}</textarea>
+        <div class="button-row">
+          <button class="primary" data-rehash="anchors">Hash with SHA-256 | SHA-3-256 | SM3 | Streebog-256 | Kupyna-256</button>
+        </div>
         <p class="small muted">One input, five real digests: SHA-256, SHA-3-256, SM3, Streebog-256, Kupyna-256.</p>
       </div>
       <div class="panel">
@@ -629,6 +640,12 @@ function wireEvents(): void {
       const key = copy.dataset.copyKey ?? '';
       const value = copy.dataset.copyValue ?? '';
       void copyDigest(key, value);
+      return;
+    }
+
+    const rehash = target.closest<HTMLButtonElement>('[data-rehash]');
+    if (rehash) {
+      render();
       return;
     }
   });
