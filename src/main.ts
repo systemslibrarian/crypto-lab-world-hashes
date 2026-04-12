@@ -110,7 +110,7 @@ function mutateInput(input: string, mode: InputMode): string {
 }
 
 function sm3DigestHex(bytes: Uint8Array): string {
-  return sm3Hash(bytes);
+  return sm3Hash(Array.from(bytes));
 }
 
 function sha256Hex(bytes: Uint8Array): string {
@@ -155,13 +155,14 @@ function changedHexBits(a: string, b: string): number {
 function copyButton(resultKey: string, value: string): string {
   const copied = state.copyState.key === resultKey && state.copyState.status === 'copied';
   const errored = state.copyState.key === resultKey && state.copyState.status === 'error';
-  const label = copied ? 'Copied' : errored ? 'Copy failed' : 'Copy';
-  return `<button class="copy-btn" data-copy-key="${resultKey}" data-copy-value="${value}">${label}</button>`;
+  const label = copied ? 'Copied' : errored ? 'Copy failed' : 'Copy digest';
+  const text = copied ? 'Copied' : errored ? 'Copy failed' : 'Copy';
+  return `<button class="copy-btn" aria-label="${label}" data-copy-key="${escapeHtml(resultKey)}" data-copy-value="${escapeHtml(value)}">${text}</button>`;
 }
 
 function hashRow(title: string, digest: string, key: string): string {
   return `
-    <div class="card">
+    <div class="card" role="status" aria-live="polite">
       <div class="result-header">
         <strong>${title}</strong>
         ${copyButton(key, digest)}
@@ -305,7 +306,7 @@ function renderStreebogExhibit(): string {
       <div class="panel">
         <h3>Mandatory S-box connection note</h3>
         <div class="callout warn">
-          Streebog uses the same S-box as Kuznyechik. In 2019, L\'eo Perrin and co-authors documented hidden structure in that S-box inconsistent
+          Streebog uses the same S-box as Kuznyechik. In 2019, Léo Perrin and co-authors documented hidden structure in that S-box inconsistent
           with random generation. The same S-box controversy from Kuznyechik applies here. Use Streebog only when Russian GOST R 34.11-2012 compliance requires it.
         </div>
         <p class="small">
@@ -361,7 +362,7 @@ function renderKupynaExhibit(): string {
       <div class="panel">
         <h2>Exhibit 3 — Kupyna (Ukraine)</h2>
         <p class="muted small">
-          <strong>DSTU 7564:2014</strong> defines Kupyna as Ukraine\'s national hash standard with 256-bit and 512-bit variants.
+          <strong>DSTU 7564:2014</strong> defines Kupyna as Ukraine's national hash standard with 256-bit and 512-bit variants.
           It uses a permutation-driven sponge-like wide-pipe design instead of Merkle-Damgard chaining.
         </p>
         <label for="kupyna-mode">Input mode</label>
@@ -393,7 +394,7 @@ function renderKupynaExhibit(): string {
         </ul>
         <div class="callout">
           <strong>Geopolitical context:</strong> DSTU 7564:2014 was standardized in the same year Russia annexed Crimea.
-          Ukraine\'s migration away from Russian GOST profiles is a concrete example of cryptographic sovereignty.
+          Ukraine's migration away from Russian GOST profiles is a concrete example of cryptographic sovereignty.
         </div>
         <div class="callout good" style="margin-top: 0.8rem;">
           <strong>Why this matters:</strong> Kupyna is both a technical primitive and a policy statement about standards independence.
@@ -487,10 +488,12 @@ function renderAnchorsExhibit(): string {
     <div class="panel" style="margin-top: 1rem;">
       <h3>Five-way avalanche snapshot</h3>
       <p class="small muted">Modified input used for comparison: <code>${escapeHtml(changedInput)}</code></p>
-      <table class="comparison-table">
-        <thead><tr><th>Algorithm</th><th>Changed bits after one edit</th></tr></thead>
-        <tbody>${avalancheRows}</tbody>
-      </table>
+      <div class="compare-table-wrap">
+        <table class="comparison-table">
+          <thead><tr><th>Algorithm</th><th>Changed bits after one edit</th></tr></thead>
+          <tbody>${avalancheRows}</tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -554,9 +557,50 @@ function render(): void {
     throw new Error('Missing #app mount node');
   }
 
+  const activeEl = document.activeElement as HTMLElement | null;
+  const focusId = activeEl?.id ?? '';
+  let cursorStart = 0;
+  let cursorEnd = 0;
+  if (activeEl instanceof HTMLTextAreaElement || activeEl instanceof HTMLInputElement) {
+    cursorStart = activeEl.selectionStart ?? 0;
+    cursorEnd = activeEl.selectionEnd ?? 0;
+  }
+
   const theme = document.documentElement.getAttribute('data-theme') ?? 'dark';
   const toggleEmoji = theme === 'dark' ? '☀️' : '🌙';
   const toggleLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+
+  const tabs: Array<{ id: TabId; label: string }> = [
+    { id: 'sm3', label: '1. SM3' },
+    { id: 'streebog', label: '2. Streebog' },
+    { id: 'kupyna', label: '3. Kupyna' },
+    { id: 'anchors', label: '4. Anchors' },
+    { id: 'decision', label: '5. Comparison' }
+  ];
+
+  const tabButtons = tabs.map((t) => {
+    const active = state.activeTab === t.id;
+    return `<button class="tab-button ${active ? 'active' : ''}"
+      role="tab"
+      aria-selected="${active}"
+      aria-controls="panel-${t.id}"
+      tabindex="${active ? '0' : '-1'}"
+      data-tab-target="${t.id}">${t.label}</button>`;
+  }).join('');
+
+  const panels: Record<TabId, string> = {
+    sm3: renderSm3Exhibit(),
+    streebog: renderStreebogExhibit(),
+    kupyna: renderKupynaExhibit(),
+    anchors: renderAnchorsExhibit(),
+    decision: renderDecisionExhibit()
+  };
+
+  const panelSections = tabs.map((t) => {
+    const active = state.activeTab === t.id;
+    return `<section id="panel-${t.id}" class="tab-panel ${active ? 'active' : ''}"
+      role="tabpanel" aria-hidden="${!active}" ${!active ? 'tabindex="-1"' : ''}>${panels[t.id]}</section>`;
+  }).join('');
 
   app.innerHTML = `
     <main class="app-shell" id="main-content">
@@ -574,21 +618,23 @@ function render(): void {
         </p>
       </header>
 
-      <nav class="tabs" aria-label="Exhibit tabs">
-        <button class="tab-button ${state.activeTab === 'sm3' ? 'active' : ''}" data-tab-target="sm3">1. SM3</button>
-        <button class="tab-button ${state.activeTab === 'streebog' ? 'active' : ''}" data-tab-target="streebog">2. Streebog</button>
-        <button class="tab-button ${state.activeTab === 'kupyna' ? 'active' : ''}" data-tab-target="kupyna">3. Kupyna</button>
-        <button class="tab-button ${state.activeTab === 'anchors' ? 'active' : ''}" data-tab-target="anchors">4. Anchors</button>
-        <button class="tab-button ${state.activeTab === 'decision' ? 'active' : ''}" data-tab-target="decision">5. Comparison</button>
+      <nav class="tabs" role="tablist" aria-label="Exhibit tabs">
+        ${tabButtons}
       </nav>
 
-      <section class="tab-panel ${state.activeTab === 'sm3' ? 'active' : ''}">${renderSm3Exhibit()}</section>
-      <section class="tab-panel ${state.activeTab === 'streebog' ? 'active' : ''}">${renderStreebogExhibit()}</section>
-      <section class="tab-panel ${state.activeTab === 'kupyna' ? 'active' : ''}">${renderKupynaExhibit()}</section>
-      <section class="tab-panel ${state.activeTab === 'anchors' ? 'active' : ''}">${renderAnchorsExhibit()}</section>
-      <section class="tab-panel ${state.activeTab === 'decision' ? 'active' : ''}">${renderDecisionExhibit()}</section>
+      ${panelSections}
     </main>
   `;
+
+  if (focusId) {
+    const restored = document.getElementById(focusId);
+    if (restored) {
+      restored.focus({ preventScroll: true });
+      if (restored instanceof HTMLTextAreaElement || restored instanceof HTMLInputElement) {
+        restored.setSelectionRange(cursorStart, cursorEnd);
+      }
+    }
+  }
 }
 
 async function copyDigest(copyKey: string, value: string): Promise<void> {
@@ -707,6 +753,40 @@ function wireEvents(): void {
     if (target.id === 'anchors-mode') {
       state.anchors.mode = target.value as InputMode;
       render();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!target || target.getAttribute('role') !== 'tab') {
+      return;
+    }
+
+    const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const currentIndex = tabs.indexOf(target as HTMLButtonElement);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % tabs.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = tabs.length - 1;
+    }
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      const tabId = tabs[nextIndex].dataset.tabTarget as TabId | undefined;
+      if (tabId) {
+        state.activeTab = tabId;
+        render();
+        tabs[nextIndex]?.focus();
+      }
     }
   });
 }
