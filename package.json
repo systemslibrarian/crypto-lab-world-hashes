@@ -1,0 +1,36 @@
+{
+  "name": "crypto-lab-world-hashes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "World Hashes demo: SM3, Streebog, Kupyna, SHA-256, and SHA-3.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "deploy": "npm run build && gh-pages -d dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/systemslibrarian/crypto-lab-world-hashes.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/systemslibrarian/crypto-lab-world-hashes/issues"
+  },
+  "homepage": "https://github.com/systemslibrarian/crypto-lab-world-hashes#readme",
+  "dependencies": {
+    "@li0ard/kupyna": "^0.1.3",
+    "@li0ard/streebog": "^0.2.5",
+    "@noble/hashes": "^2.2.0",
+    "sm-crypto": "^0.4.0"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^8.0.8"
+  }
+}
