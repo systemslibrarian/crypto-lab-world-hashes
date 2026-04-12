@@ -22,8 +22,8 @@ var e=(e,t)=>()=>(t||e((t={exports:{}}).exports,t),t.exports);(function(){let e=
         <label for="sm3-input">Input</label>
         <textarea id="sm3-input">${q(K.sm3.input)}</textarea>
         <div class="button-row">
-          <button class="primary" data-focus-result="sm3-result">Hash with SM3</button>
-          <button data-focus-result="sm3-sha-result">Hash with SHA-256</button>
+          <button class="primary" data-rehash="sm3">Hash with SM3</button>
+          <button data-rehash="sm3">Hash with SHA-256</button>
         </div>
         <div id="sm3-result">${Q(`SM3 (256-bit)`,i,`sm3`)}</div>
         <div id="sm3-sha-result">${Q(`SHA-256 (256-bit)`,a,`sha256`)}</div>
@@ -91,6 +91,10 @@ var e=(e,t)=>()=>(t||e((t={exports:{}}).exports,t),t.exports);(function(){let e=
           <option value="256" ${t===256?`selected`:``}>256-bit</option>
           <option value="512" ${t===512?`selected`:``}>512-bit</option>
         </select>
+        <div class="button-row">
+          <button class="primary" data-rehash="streebog">Hash with Streebog</button>
+          <button data-rehash="streebog">Hash with ${t===256?`SHA-256`:`SHA-512`}</button>
+        </div>
         ${Q(`Streebog-${t}`,n,`streebog-${t}`)}
         ${Q(t===256?`SHA-256`:`SHA-512`,r,`streebog-ref-${t}`)}
       </div>
@@ -98,7 +102,7 @@ var e=(e,t)=>()=>(t||e((t={exports:{}}).exports,t),t.exports);(function(){let e=
         <h3>Mandatory S-box connection note</h3>
         <div class="callout warn">
           Streebog uses the same S-box as Kuznyechik. In 2019, L\'eo Perrin and co-authors documented hidden structure in that S-box inconsistent
-          with random generation. The same S-box controversy from Kuznyechik applies here. Use Streebog only when Russian compliance requires it.
+          with random generation. The same S-box controversy from Kuznyechik applies here. Use Streebog only when Russian GOST R 34.11-2012 compliance requires it.
         </div>
         <p class="small">
           See the related Kuznyechik discussion in World Ciphers Exhibit 4:
@@ -147,6 +151,10 @@ var e=(e,t)=>()=>(t||e((t={exports:{}}).exports,t),t.exports);(function(){let e=
           <option value="256" ${t===256?`selected`:``}>256-bit</option>
           <option value="512" ${t===512?`selected`:``}>512-bit</option>
         </select>
+        <div class="button-row">
+          <button class="primary" data-rehash="kupyna">Hash with Kupyna</button>
+          <button data-rehash="kupyna">Hash with ${t===256?`SHA-3-256`:`SHA-3-512`}</button>
+        </div>
         ${Q(`Kupyna-${t}`,n,`kupyna-${t}`)}
         ${Q(t===256?`SHA-3-256`:`SHA-3-512`,r,`kupyna-ref-${t}`)}
       </div>
@@ -195,6 +203,9 @@ var e=(e,t)=>()=>(t||e((t={exports:{}}).exports,t),t.exports);(function(){let e=
         </select>
         <label for="anchors-input">Input</label>
         <textarea id="anchors-input">${q(K.anchors.input)}</textarea>
+        <div class="button-row">
+          <button class="primary" data-rehash="anchors">Hash with SHA-256 | SHA-3-256 | SM3 | Streebog-256 | Kupyna-256</button>
+        </div>
         <p class="small muted">One input, five real digests: SHA-256, SHA-3-256, SM3, Streebog-256, Kupyna-256.</p>
       </div>
       <div class="panel">
@@ -293,4 +304,4 @@ var e=(e,t)=>()=>(t||e((t={exports:{}}).exports,t),t.exports);(function(){let e=
       <section class="tab-panel ${K.activeTab===`anchors`?`active`:``}">${Ut()}</section>
       <section class="tab-panel ${K.activeTab===`decision`?`active`:``}">${Wt()}</section>
     </main>
-  `}async function Gt(e,t){try{await navigator.clipboard.writeText(t),K.copyState={key:e,status:`copied`}}catch{K.copyState={key:e,status:`error`}}$(),window.setTimeout(()=>{K.copyState.key===e&&(K.copyState={key:``,status:`idle`},$())},1200)}function Kt(){document.addEventListener(`click`,e=>{let t=e.target;if(!t)return;if(t instanceof HTMLButtonElement&&t.id===`theme-toggle`){let e=(document.documentElement.getAttribute(`data-theme`)??`dark`)===`dark`?`light`:`dark`;document.documentElement.setAttribute(`data-theme`,e),localStorage.setItem(`theme`,e);let n=e===`dark`?`☀️`:`🌙`,r=e===`dark`?`Switch to light mode`:`Switch to dark mode`;t.textContent=n,t.setAttribute(`aria-label`,r),t.setAttribute(`title`,r),$();return}let n=t.closest(`[data-tab-target]`);if(n?.dataset.tabTarget){K.activeTab=n.dataset.tabTarget,$();return}let r=t.closest(`[data-copy-key]`);if(r){Gt(r.dataset.copyKey??``,r.dataset.copyValue??``);return}}),document.addEventListener(`input`,e=>{let t=e.target;if(t){if(t.id===`sm3-input`){K.sm3.input=t.value,$();return}if(t.id===`sm3-mode`){K.sm3.mode=t.value,$();return}if(t.id===`streebog-input`){K.streebog.input=t.value,$();return}if(t.id===`streebog-mode`){K.streebog.mode=t.value,$();return}if(t.id===`streebog-size`){K.streebog.size=Number.parseInt(t.value,10),$();return}if(t.id===`kupyna-input`){K.kupyna.input=t.value,$();return}if(t.id===`kupyna-mode`){K.kupyna.mode=t.value,$();return}if(t.id===`kupyna-size`){K.kupyna.size=Number.parseInt(t.value,10),$();return}if(t.id===`anchors-input`){K.anchors.input=t.value,$();return}t.id===`anchors-mode`&&(K.anchors.mode=t.value,$())}})}function qt(){$(),Kt()}qt();
+  `}async function Gt(e,t){try{await navigator.clipboard.writeText(t),K.copyState={key:e,status:`copied`}}catch{K.copyState={key:e,status:`error`}}$(),window.setTimeout(()=>{K.copyState.key===e&&(K.copyState={key:``,status:`idle`},$())},1200)}function Kt(){document.addEventListener(`click`,e=>{let t=e.target;if(!t)return;if(t instanceof HTMLButtonElement&&t.id===`theme-toggle`){let e=(document.documentElement.getAttribute(`data-theme`)??`dark`)===`dark`?`light`:`dark`;document.documentElement.setAttribute(`data-theme`,e),localStorage.setItem(`theme`,e);let n=e===`dark`?`☀️`:`🌙`,r=e===`dark`?`Switch to light mode`:`Switch to dark mode`;t.textContent=n,t.setAttribute(`aria-label`,r),t.setAttribute(`title`,r),$();return}let n=t.closest(`[data-tab-target]`);if(n?.dataset.tabTarget){K.activeTab=n.dataset.tabTarget,$();return}let r=t.closest(`[data-copy-key]`);if(r){Gt(r.dataset.copyKey??``,r.dataset.copyValue??``);return}if(t.closest(`[data-rehash]`)){$();return}}),document.addEventListener(`input`,e=>{let t=e.target;if(t){if(t.id===`sm3-input`){K.sm3.input=t.value,$();return}if(t.id===`sm3-mode`){K.sm3.mode=t.value,$();return}if(t.id===`streebog-input`){K.streebog.input=t.value,$();return}if(t.id===`streebog-mode`){K.streebog.mode=t.value,$();return}if(t.id===`streebog-size`){K.streebog.size=Number.parseInt(t.value,10),$();return}if(t.id===`kupyna-input`){K.kupyna.input=t.value,$();return}if(t.id===`kupyna-mode`){K.kupyna.mode=t.value,$();return}if(t.id===`kupyna-size`){K.kupyna.size=Number.parseInt(t.value,10),$();return}if(t.id===`anchors-input`){K.anchors.input=t.value,$();return}t.id===`anchors-mode`&&(K.anchors.mode=t.value,$())}})}function qt(){$(),Kt()}qt();
