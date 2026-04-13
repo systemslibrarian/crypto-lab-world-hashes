@@ -28,7 +28,22 @@ npm install
 npm run dev
 ```
 
-## 5. Part of the Crypto-Lab Suite
+## 5. GitHub Pages Setup
+
+This project is configured for automatic Pages deploy from GitHub Actions.
+
+1. Push this repo to GitHub on the `main` branch.
+2. In GitHub: `Settings -> Pages -> Build and deployment`.
+3. Set `Source` to `GitHub Actions`.
+4. Push to `main` (or run the `Deploy to GitHub Pages` workflow manually).
+
+Manual deploy is also available:
+
+```bash
+npm run deploy
+```
+
+## 6. Part of the Crypto-Lab Suite
 
 Part of [crypto-lab](https://systemslibrarian.github.io/crypto-lab/) — browser-based cryptography demos spanning 2,500 years of cryptographic history to NIST FIPS 2024 post-quantum standards.
 

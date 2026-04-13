@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "deploy": "npm run build && gh-pages -d dist"
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "repository": {
     "type": "git",
@@ -21,7 +22,7 @@
   "bugs": {
     "url": "https://github.com/systemslibrarian/crypto-lab-world-hashes/issues"
   },
-  "homepage": "https://github.com/systemslibrarian/crypto-lab-world-hashes#readme",
+  "homepage": "https://systemslibrarian.github.io/crypto-lab-world-hashes/",
   "dependencies": {
     "@li0ard/kupyna": "^0.1.3",
     "@li0ard/streebog": "^0.2.5",
