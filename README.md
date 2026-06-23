@@ -17,7 +17,36 @@ World Hashes demonstrates three national cryptographic hash standards — SM3 (C
 ## 3. Live Demo
 
 Link: https://systemslibrarian.github.io/crypto-lab-world-hashes/
-Five exhibits: SM3 with SHA-256 side-by-side and construction comparison, Streebog with S-box controversy documentation, Kupyna with geopolitical context and sponge construction comparison, SHA-256 and SHA-3 as reference anchors with five-way simultaneous hashing, and a full five-way comparison table with decision tree. All hash outputs are real — no simulation.
+
+Five exhibits: SM3 with SHA-256 side-by-side and construction comparison, Streebog with S-box controversy documentation, Kupyna with geopolitical context and sponge construction comparison, SHA-256 and SHA-3 as reference anchors with five-way simultaneous hashing, and a full five-way comparison table with decision tree.
+
+All hash outputs are real — no simulation. Every digest is produced in your browser by [`src/hashes.ts`](src/hashes.ts), the same module the test suite checks. Each exhibit shows a **visual avalanche diff** (changed hex nibbles highlighted, with bit-diffusion percentage against the ideal ~50%) and a live **input byte-length** readout. Nothing is sent to a server — all hashing is local.
+
+## 3a. Verified Correctness
+
+The hero shows a live self-test badge (e.g. `✓ 17/17 test vectors verified`). On every page load the app recomputes published **known-answer test vectors** and compares them byte-for-byte against the values in each algorithm's defining standard:
+
+| Algorithm | Standard | Vectors |
+| --- | --- | --- |
+| SM3 | GM/T 0004-2012 | empty, `"abc"` |
+| SHA-256 / SHA-512 | FIPS 180-4 | empty, `"abc"`, fox |
+| SHA-3-256 / SHA-3-512 | FIPS 202 | empty, `"abc"` |
+| Streebog-256 / -512 | GOST R 34.11-2012 | empty, fox |
+| Kupyna-256 / -512 | DSTU 7564:2014 | empty, fox |
+
+The same vectors run in CI via [Vitest](https://vitest.dev/) on every push, alongside a happy-dom render test that asserts the UI mounts and reports all vectors passing, and an [axe-core](https://github.com/dequelabs/axe-core) accessibility scan.
+
+```bash
+npm test         # known-answer + render + accessibility tests
+npm run test:watch
+npm run typecheck
+```
+
+## 3b. Accessibility
+
+The lab is built to WCAG 2.1 AA: semantic landmarks and a skip link, the full ARIA tab pattern with arrow/Home/End keyboard navigation, visible focus rings, focus and caret preserved across re-renders, `scope`-annotated data tables, `prefers-reduced-motion` support, and a `<noscript>` fallback. Avalanche highlights carry three independent cues (colour, background, underline) so they never rely on colour alone, and colour contrast meets AA in both themes.
+
+`npm test` runs an automated axe-core scan (WCAG 2 A/AA) against the rendered app in both themes on every push. Layout-dependent colour-contrast is verified separately, since a headless DOM has no rendering engine.
 
 ## 4. How to Run Locally
 

@@ -1,10 +1,7 @@
 import './styles.css';
 
-import { kupyna256, kupyna512 } from '@li0ard/kupyna';
-import { streebog256, streebog512 } from '@li0ard/streebog';
-import { sha256, sha512 } from '@noble/hashes/sha2.js';
-import { sha3_256, sha3_512 } from '@noble/hashes/sha3.js';
-import { sm3 as sm3Hash } from 'sm-crypto';
+import { ALGORITHM_LABELS, computeHex, runSelfTest } from './hashes';
+import type { SelfTestReport } from './hashes';
 
 type TabId = 'sm3' | 'streebog' | 'kupyna' | 'anchors' | 'decision';
 type InputMode = 'text' | 'hex';
@@ -50,6 +47,21 @@ const state: {
 
 const encoder = new TextEncoder();
 
+// Persisting the theme must never throw: localStorage access raises a
+// SecurityError in sandboxed iframes and some private-browsing modes.
+function saveTheme(theme: string): void {
+  try {
+    localStorage.setItem('theme', theme);
+  } catch {
+    /* storage unavailable — theme still applies for this session */
+  }
+}
+
+// Run every known-answer test vector once, at load, against the same hashing
+// code the UI uses. The result is surfaced as a trust badge in the hero so a
+// visitor can see the live build matches the published standards.
+const selfTest: SelfTestReport = runSelfTest();
+
 function escapeHtml(input: string): string {
   return input
     .replace(/&/g, '&amp;')
@@ -57,10 +69,6 @@ function escapeHtml(input: string): string {
     .replace(/>/g, '&gt;')
     .replace(/\"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
 }
 
 function normalizeHex(input: string): string {
@@ -109,33 +117,17 @@ function mutateInput(input: string, mode: InputMode): string {
   return `${replacement}${normalized.slice(1)}`;
 }
 
-function sm3DigestHex(bytes: Uint8Array): string {
-  return sm3Hash(Array.from(bytes));
-}
-
-function sha256Hex(bytes: Uint8Array): string {
-  return bytesToHex(sha256(bytes));
-}
-
-function sha512Hex(bytes: Uint8Array): string {
-  return bytesToHex(sha512(bytes));
-}
-
-function sha3_256Hex(bytes: Uint8Array): string {
-  return bytesToHex(sha3_256(bytes));
-}
-
-function sha3_512Hex(bytes: Uint8Array): string {
-  return bytesToHex(sha3_512(bytes));
-}
-
-function streebogHex(bytes: Uint8Array, size: DigestSize): string {
-  return size === 256 ? bytesToHex(streebog256(bytes)) : bytesToHex(streebog512(bytes));
-}
-
-function kupynaHex(bytes: Uint8Array, size: DigestSize): string {
-  return size === 256 ? bytesToHex(kupyna256(bytes)) : bytesToHex(kupyna512(bytes));
-}
+// Thin wrappers over the single hashing source of truth in ./hashes, so the
+// digests rendered here are produced by the exact code the test suite checks.
+const sm3DigestHex = (bytes: Uint8Array): string => computeHex('sm3', bytes);
+const sha256Hex = (bytes: Uint8Array): string => computeHex('sha256', bytes);
+const sha512Hex = (bytes: Uint8Array): string => computeHex('sha512', bytes);
+const sha3_256Hex = (bytes: Uint8Array): string => computeHex('sha3-256', bytes);
+const sha3_512Hex = (bytes: Uint8Array): string => computeHex('sha3-512', bytes);
+const streebogHex = (bytes: Uint8Array, size: DigestSize): string =>
+  computeHex(size === 256 ? 'streebog256' : 'streebog512', bytes);
+const kupynaHex = (bytes: Uint8Array, size: DigestSize): string =>
+  computeHex(size === 256 ? 'kupyna256' : 'kupyna512', bytes);
 
 function changedHexBits(a: string, b: string): number {
   const maxLength = Math.max(a.length, b.length);
@@ -168,6 +160,95 @@ function hashRow(title: string, digest: string, key: string): string {
         ${copyButton(key, digest)}
       </div>
       <div class="digest-block">${digest}</div>
+    </div>
+  `;
+}
+
+/** Renders `compared`, highlighting every hex nibble that differs from `reference`. */
+function diffDigestHtml(reference: string, compared: string): string {
+  let out = '';
+  for (let i = 0; i < compared.length; i += 1) {
+    const char = compared[i];
+    if (reference[i] === char) {
+      out += char;
+    } else {
+      out += `<span class="nibble-changed">${char}</span>`;
+    }
+  }
+  return out;
+}
+
+/**
+ * Avalanche comparison card: original digest, the digest after a one-character
+ * input change with changed nibbles highlighted, and the bit-diffusion stat.
+ * A strong hash should flip close to 50% of output bits from a tiny input edit.
+ */
+function avalancheCard(label: string, original: string, mutated: string, bits: number): string {
+  const changed = changedHexBits(original, mutated);
+  const pct = (changed / bits) * 100;
+  const pctText = pct.toFixed(1);
+  return `
+    <div class="card">
+      <div class="result-header"><strong>${label}</strong></div>
+      <div class="digest-block">${original}</div>
+      <div class="digest-block">${diffDigestHtml(original, mutated)}</div>
+      <div class="avalanche-meter" role="img"
+        aria-label="${changed} of ${bits} bits changed, ${pctText} percent">
+        <span class="avalanche-fill" style="width: ${Math.min(pct, 100)}%"></span>
+        <span class="avalanche-ideal" aria-hidden="true"></span>
+      </div>
+      <p class="small muted">Changed bits: <strong>${changed}</strong> / ${bits}
+        (<strong>${pctText}%</strong> · ideal ≈ 50%)</p>
+    </div>
+  `;
+}
+
+function byteCount(bytes: Uint8Array): string {
+  const n = bytes.length;
+  return `<p class="small muted byte-count">Input length: <strong>${n}</strong> ${n === 1 ? 'byte' : 'bytes'} · ${n * 8} bits</p>`;
+}
+
+/** Hero trust chip reporting the live known-answer self-test outcome. */
+function verificationBadge(): string {
+  const ok = selfTest.failed === 0;
+  const cls = ok ? 'badge badge-verified' : 'badge badge-failed';
+  const icon = ok ? '✓' : '✕';
+  const text = ok
+    ? `${selfTest.passed}/${selfTest.total} test vectors verified`
+    : `${selfTest.failed}/${selfTest.total} vectors FAILED`;
+  return `<span class="${cls}" title="Live known-answer self-test against the algorithms' defining standards">${icon} ${text}</span>`;
+}
+
+/** Full known-answer table: input → authoritative source → live pass/fail. */
+function verificationPanel(): string {
+  const rows = selfTest.results
+    .map((r) => {
+      const status = r.pass
+        ? '<span class="kat-pass">✓ pass</span>'
+        : '<span class="kat-fail">✕ fail</span>';
+      return `<tr>
+        <td><strong>${ALGORITHM_LABELS[r.vector.algorithm]}</strong></td>
+        <td>${escapeHtml(r.vector.inputLabel)}</td>
+        <td class="kat-source">${escapeHtml(r.vector.source)}</td>
+        <td>${status}</td>
+      </tr>`;
+    })
+    .join('');
+
+  return `
+    <div class="panel" style="margin-top: 1rem;">
+      <h3>Known-answer verification</h3>
+      <p class="small muted">
+        Every digest in this lab is produced by the same module checked here. On load, the page recomputes
+        ${selfTest.total} published test vectors and compares them byte-for-byte against the values in each
+        algorithm's defining standard — <strong>${selfTest.passed}/${selfTest.total} passing</strong>.
+      </p>
+      <div class="compare-table-wrap">
+        <table class="comparison-table kat-table">
+          <thead><tr><th scope="col">Algorithm</th><th scope="col">Input</th><th scope="col">Source</th><th scope="col">Self-test</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -205,10 +286,8 @@ function renderSm3Exhibit(): string {
         </select>
         <label for="sm3-input">Input</label>
         <textarea id="sm3-input">${escapeHtml(state.sm3.input)}</textarea>
-        <div class="button-row">
-          <button class="primary" data-rehash="sm3">Hash with SM3</button>
-          <button data-rehash="sm3">Hash with SHA-256</button>
-        </div>
+        ${byteCount(original)}
+        <p class="live-note"><span class="live-dot" aria-hidden="true"></span>Digests recompute live as you type — both algorithms hash the same bytes.</p>
         <div id="sm3-result">${hashRow('SM3 (256-bit)', sm3Digest, 'sm3')}</div>
         <div id="sm3-sha-result">${hashRow('SHA-256 (256-bit)', shaDigest, 'sha256')}</div>
       </div>
@@ -239,20 +318,10 @@ function renderSm3Exhibit(): string {
     <div class="panel" style="margin-top: 1rem;">
       <h3>Avalanche demo (single-character change)</h3>
       <p class="small muted">Original input: <code>${escapeHtml(state.sm3.input)}</code></p>
-      <p class="small muted">Modified input: <code>${escapeHtml(mutatedInput)}</code></p>
+      <p class="small muted">Modified input: <code>${escapeHtml(mutatedInput)}</code> — <span class="nibble-changed">highlighted</span> nibbles differ from the original digest.</p>
       <div class="grid-2">
-        <div class="card">
-          <strong>SM3</strong>
-          <div class="digest-block">${sm3Digest}</div>
-          <div class="digest-block">${sm3Mutated}</div>
-          <p class="small">Changed bits: <strong>${changedHexBits(sm3Digest, sm3Mutated)}</strong> / 256</p>
-        </div>
-        <div class="card">
-          <strong>SHA-256</strong>
-          <div class="digest-block">${shaDigest}</div>
-          <div class="digest-block">${shaMutated}</div>
-          <p class="small">Changed bits: <strong>${changedHexBits(shaDigest, shaMutated)}</strong> / 256</p>
-        </div>
+        ${avalancheCard('SM3', sm3Digest, sm3Mutated, 256)}
+        ${avalancheCard('SHA-256', shaDigest, shaMutated, 256)}
       </div>
     </div>
   `;
@@ -296,10 +365,8 @@ function renderStreebogExhibit(): string {
           <option value="256" ${currentSize === 256 ? 'selected' : ''}>256-bit</option>
           <option value="512" ${currentSize === 512 ? 'selected' : ''}>512-bit</option>
         </select>
-        <div class="button-row">
-          <button class="primary" data-rehash="streebog">Hash with Streebog</button>
-          <button data-rehash="streebog">Hash with ${currentSize === 256 ? 'SHA-256' : 'SHA-512'}</button>
-        </div>
+        ${byteCount(parsed.bytes)}
+        <p class="live-note"><span class="live-dot" aria-hidden="true"></span>Digests recompute live as you type.</p>
         ${hashRow(`Streebog-${currentSize}`, streebogDigest, `streebog-${currentSize}`)}
         ${hashRow(currentSize === 256 ? 'SHA-256' : 'SHA-512', referenceDigest, `streebog-ref-${currentSize}`)}
       </div>
@@ -321,19 +388,10 @@ function renderStreebogExhibit(): string {
     </div>
     <div class="panel" style="margin-top: 1rem;">
       <h3>Avalanche demo</h3>
+      <p class="small muted"><span class="nibble-changed">Highlighted</span> nibbles differ after a one-character input change.</p>
       <div class="grid-2">
-        <div class="card">
-          <strong>Streebog-${currentSize}</strong>
-          <div class="digest-block">${streebogDigest}</div>
-          <div class="digest-block">${streebogChanged}</div>
-          <p class="small">Changed bits: <strong>${changedHexBits(streebogDigest, streebogChanged)}</strong> / ${currentSize}</p>
-        </div>
-        <div class="card">
-          <strong>${currentSize === 256 ? 'SHA-256' : 'SHA-512'}</strong>
-          <div class="digest-block">${referenceDigest}</div>
-          <div class="digest-block">${referenceChanged}</div>
-          <p class="small">Changed bits: <strong>${changedHexBits(referenceDigest, referenceChanged)}</strong> / ${currentSize}</p>
-        </div>
+        ${avalancheCard(`Streebog-${currentSize}`, streebogDigest, streebogChanged, currentSize)}
+        ${avalancheCard(currentSize === 256 ? 'SHA-256' : 'SHA-512', referenceDigest, referenceChanged, currentSize)}
       </div>
     </div>
   `;
@@ -377,10 +435,8 @@ function renderKupynaExhibit(): string {
           <option value="256" ${currentSize === 256 ? 'selected' : ''}>256-bit</option>
           <option value="512" ${currentSize === 512 ? 'selected' : ''}>512-bit</option>
         </select>
-        <div class="button-row">
-          <button class="primary" data-rehash="kupyna">Hash with Kupyna</button>
-          <button data-rehash="kupyna">Hash with ${currentSize === 256 ? 'SHA-3-256' : 'SHA-3-512'}</button>
-        </div>
+        ${byteCount(parsed.bytes)}
+        <p class="live-note"><span class="live-dot" aria-hidden="true"></span>Digests recompute live as you type.</p>
         ${hashRow(`Kupyna-${currentSize}`, kupynaDigest, `kupyna-${currentSize}`)}
         ${hashRow(currentSize === 256 ? 'SHA-3-256' : 'SHA-3-512', sha3Digest, `kupyna-ref-${currentSize}`)}
       </div>
@@ -403,19 +459,10 @@ function renderKupynaExhibit(): string {
     </div>
     <div class="panel" style="margin-top: 1rem;">
       <h3>Avalanche demo</h3>
+      <p class="small muted"><span class="nibble-changed">Highlighted</span> nibbles differ after a one-character input change.</p>
       <div class="grid-2">
-        <div class="card">
-          <strong>Kupyna-${currentSize}</strong>
-          <div class="digest-block">${kupynaDigest}</div>
-          <div class="digest-block">${kupynaChanged}</div>
-          <p class="small">Changed bits: <strong>${changedHexBits(kupynaDigest, kupynaChanged)}</strong> / ${currentSize}</p>
-        </div>
-        <div class="card">
-          <strong>${currentSize === 256 ? 'SHA-3-256' : 'SHA-3-512'}</strong>
-          <div class="digest-block">${sha3Digest}</div>
-          <div class="digest-block">${sha3Changed}</div>
-          <p class="small">Changed bits: <strong>${changedHexBits(sha3Digest, sha3Changed)}</strong> / ${currentSize}</p>
-        </div>
+        ${avalancheCard(`Kupyna-${currentSize}`, kupynaDigest, kupynaChanged, currentSize)}
+        ${avalancheCard(currentSize === 256 ? 'SHA-3-256' : 'SHA-3-512', sha3Digest, sha3Changed, currentSize)}
       </div>
     </div>
   `;
@@ -456,7 +503,9 @@ function renderAnchorsExhibit(): string {
   const avalancheRows = Object.entries(digests)
     .map(([name, digest]) => {
       const changed = changedDigests[name as keyof typeof changedDigests];
-      return `<tr><td>${name}</td><td>${changedHexBits(digest, changed)} / 256</td></tr>`;
+      const bitsChanged = changedHexBits(digest, changed);
+      const pct = ((bitsChanged / 256) * 100).toFixed(1);
+      return `<tr><td>${name}</td><td>${bitsChanged} / 256</td><td>${pct}%</td></tr>`;
     })
     .join('');
 
@@ -471,10 +520,8 @@ function renderAnchorsExhibit(): string {
         </select>
         <label for="anchors-input">Input</label>
         <textarea id="anchors-input">${escapeHtml(state.anchors.input)}</textarea>
-        <div class="button-row">
-          <button class="primary" data-rehash="anchors">Hash with SHA-256 | SHA-3-256 | SM3 | Streebog-256 | Kupyna-256</button>
-        </div>
-        <p class="small muted">One input, five real digests: SHA-256, SHA-3-256, SM3, Streebog-256, Kupyna-256.</p>
+        ${byteCount(parsed.bytes)}
+        <p class="live-note"><span class="live-dot" aria-hidden="true"></span>One input, five real digests, recomputed live: SHA-256, SHA-3-256, SM3, Streebog-256, Kupyna-256.</p>
       </div>
       <div class="panel">
         <h3>Reference summary</h3>
@@ -487,10 +534,10 @@ function renderAnchorsExhibit(): string {
     <div class="grid-2" style="margin-top: 1rem;">${outputCards}</div>
     <div class="panel" style="margin-top: 1rem;">
       <h3>Five-way avalanche snapshot</h3>
-      <p class="small muted">Modified input used for comparison: <code>${escapeHtml(changedInput)}</code></p>
+      <p class="small muted">Modified input used for comparison: <code>${escapeHtml(changedInput)}</code> — a strong hash flips close to 50% of output bits.</p>
       <div class="compare-table-wrap">
         <table class="comparison-table">
-          <thead><tr><th>Algorithm</th><th>Changed bits after one edit</th></tr></thead>
+          <thead><tr><th scope="col">Algorithm</th><th scope="col">Changed bits after one edit</th><th scope="col">Diffusion</th></tr></thead>
           <tbody>${avalancheRows}</tbody>
         </table>
       </div>
@@ -506,24 +553,24 @@ function renderDecisionExhibit(): string {
         <table class="comparison-table">
           <thead>
             <tr>
-              <th>Property</th>
-              <th>SM3</th>
-              <th>Streebog-256/512</th>
-              <th>Kupyna-256/512</th>
-              <th>SHA-256</th>
-              <th>SHA-3-256</th>
+              <th scope="col">Property</th>
+              <th scope="col">SM3</th>
+              <th scope="col">Streebog-256/512</th>
+              <th scope="col">Kupyna-256/512</th>
+              <th scope="col">SHA-256</th>
+              <th scope="col">SHA-3-256</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Country</td><td>China</td><td>Russia</td><td>Ukraine</td><td>USA (NIST)</td><td>USA (NIST)</td></tr>
-            <tr><td>Year</td><td>2010</td><td>2012</td><td>2014</td><td>2001</td><td>2015</td></tr>
-            <tr><td>Output sizes</td><td>256-bit</td><td>256 / 512-bit</td><td>256 / 512-bit</td><td>256-bit</td><td>224/256/384/512</td></tr>
-            <tr><td>Construction</td><td>Merkle-Damgard</td><td>Wide-pipe MD</td><td>Sponge-like</td><td>Merkle-Damgard</td><td>Sponge</td></tr>
-            <tr><td>ISO standardized</td><td>Yes</td><td>Yes</td><td>No (DSTU)</td><td>Yes</td><td>Yes</td></tr>
-            <tr><td>Design transparency</td><td>Partial</td><td>S-box opaque concern</td><td>Published</td><td>Published</td><td>Published</td></tr>
-            <tr><td>Known practical breaks</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td></tr>
-            <tr><td>Use when</td><td>China compliance</td><td>Russian GOST compliance</td><td>Ukrainian DSTU compliance</td><td>General use</td><td>New designs</td></tr>
-            <tr><td>Trust level</td><td>Medium-High</td><td>Use with caution</td><td>High</td><td>High</td><td>High</td></tr>
+            <tr><th scope="row">Country</th><td>China</td><td>Russia</td><td>Ukraine</td><td>USA (NIST)</td><td>USA (NIST)</td></tr>
+            <tr><th scope="row">Year</th><td>2010</td><td>2012</td><td>2014</td><td>2001</td><td>2015</td></tr>
+            <tr><th scope="row">Output sizes</th><td>256-bit</td><td>256 / 512-bit</td><td>256 / 512-bit</td><td>256-bit</td><td>224/256/384/512</td></tr>
+            <tr><th scope="row">Construction</th><td>Merkle-Damgard</td><td>Wide-pipe MD</td><td>Sponge-like</td><td>Merkle-Damgard</td><td>Sponge</td></tr>
+            <tr><th scope="row">ISO standardized</th><td>Yes</td><td>Yes</td><td>No (DSTU)</td><td>Yes</td><td>Yes</td></tr>
+            <tr><th scope="row">Design transparency</th><td>Partial</td><td>S-box opaque concern</td><td>Published</td><td>Published</td><td>Published</td></tr>
+            <tr><th scope="row">Known practical breaks</th><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td></tr>
+            <tr><th scope="row">Use when</th><td>China compliance</td><td>Russian GOST compliance</td><td>Ukrainian DSTU compliance</td><td>General use</td><td>New designs</td></tr>
+            <tr><th scope="row">Trust level</th><td>Medium-High</td><td>Use with caution</td><td>High</td><td>High</td><td>High</td></tr>
           </tbody>
         </table>
       </div>
@@ -548,6 +595,7 @@ function renderDecisionExhibit(): string {
         </ul>
       </div>
     </div>
+    ${verificationPanel()}
   `;
 }
 
@@ -581,6 +629,7 @@ function render(): void {
   const tabButtons = tabs.map((t) => {
     const active = state.activeTab === t.id;
     return `<button class="tab-button ${active ? 'active' : ''}"
+      id="tab-${t.id}"
       role="tab"
       aria-selected="${active}"
       aria-controls="panel-${t.id}"
@@ -598,8 +647,11 @@ function render(): void {
 
   const panelSections = tabs.map((t) => {
     const active = state.activeTab === t.id;
+    // Inactive panels use the native `hidden` attribute, which removes them from
+    // both the accessibility tree and the tab order — avoiding the aria-hidden
+    // anti-pattern of hiding a subtree that still contains focusable controls.
     return `<section id="panel-${t.id}" class="tab-panel ${active ? 'active' : ''}"
-      role="tabpanel" aria-hidden="${!active}" ${!active ? 'tabindex="-1"' : ''}>${panels[t.id]}</section>`;
+      role="tabpanel" aria-labelledby="tab-${t.id}" ${active ? '' : 'hidden'}>${panels[t.id]}</section>`;
   }).join('');
 
   app.innerHTML = `
@@ -610,6 +662,7 @@ function render(): void {
           <span class="badge">National Hash Standards</span>
           <span class="badge">SM3 · Streebog · Kupyna</span>
           <span class="badge">SHA-256 · SHA-3 Reference</span>
+          ${verificationBadge()}
         </div>
         <h1>crypto-lab-world-hashes</h1>
         <p>
@@ -664,12 +717,9 @@ function wireEvents(): void {
       const currentTheme = document.documentElement.getAttribute('data-theme') ?? 'dark';
       const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', nextTheme);
-      localStorage.setItem('theme', nextTheme);
-      const nextEmoji = nextTheme === 'dark' ? '☀️' : '🌙';
-      const nextLabel = nextTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
-      target.textContent = nextEmoji;
-      target.setAttribute('aria-label', nextLabel);
-      target.setAttribute('title', nextLabel);
+      saveTheme(nextTheme);
+      // render() rebuilds the toggle button from the new theme (icon + label),
+      // and restores focus to it by id.
       render();
       return;
     }
@@ -688,72 +738,40 @@ function wireEvents(): void {
       void copyDigest(key, value);
       return;
     }
-
-    const rehash = target.closest<HTMLButtonElement>('[data-rehash]');
-    if (rehash) {
-      render();
-      return;
-    }
   });
+
+  const inputHandlers: Record<string, (value: string) => void> = {
+    'sm3-input': (v) => { state.sm3.input = v; },
+    'sm3-mode': (v) => { state.sm3.mode = v as InputMode; },
+    'streebog-input': (v) => { state.streebog.input = v; },
+    'streebog-mode': (v) => { state.streebog.mode = v as InputMode; },
+    'streebog-size': (v) => { state.streebog.size = Number.parseInt(v, 10) as DigestSize; },
+    'kupyna-input': (v) => { state.kupyna.input = v; },
+    'kupyna-mode': (v) => { state.kupyna.mode = v as InputMode; },
+    'kupyna-size': (v) => { state.kupyna.size = Number.parseInt(v, 10) as DigestSize; },
+    'anchors-input': (v) => { state.anchors.input = v; },
+    'anchors-mode': (v) => { state.anchors.mode = v as InputMode; }
+  };
 
   document.addEventListener('input', (event) => {
     const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
-    if (!target) {
+    const handler = target ? inputHandlers[target.id] : undefined;
+    if (!target || !handler) {
       return;
     }
+    handler(target.value);
+    // Don't rebuild the DOM mid-IME-composition: recreating the textarea cancels
+    // composition (e.g. typing Chinese for SM3). `isComposing` is read per-event,
+    // so — unlike a persistent flag — it can never get stuck if a composition is
+    // abandoned by blurring or switching tabs before it commits.
+    if (!(event as InputEvent).isComposing) {
+      render();
+    }
+  });
 
-    if (target.id === 'sm3-input') {
-      state.sm3.input = target.value;
-      render();
-      return;
-    }
-    if (target.id === 'sm3-mode') {
-      state.sm3.mode = target.value as InputMode;
-      render();
-      return;
-    }
-
-    if (target.id === 'streebog-input') {
-      state.streebog.input = target.value;
-      render();
-      return;
-    }
-    if (target.id === 'streebog-mode') {
-      state.streebog.mode = target.value as InputMode;
-      render();
-      return;
-    }
-    if (target.id === 'streebog-size') {
-      state.streebog.size = Number.parseInt(target.value, 10) as DigestSize;
-      render();
-      return;
-    }
-
-    if (target.id === 'kupyna-input') {
-      state.kupyna.input = target.value;
-      render();
-      return;
-    }
-    if (target.id === 'kupyna-mode') {
-      state.kupyna.mode = target.value as InputMode;
-      render();
-      return;
-    }
-    if (target.id === 'kupyna-size') {
-      state.kupyna.size = Number.parseInt(target.value, 10) as DigestSize;
-      render();
-      return;
-    }
-
-    if (target.id === 'anchors-input') {
-      state.anchors.input = target.value;
-      render();
-      return;
-    }
-    if (target.id === 'anchors-mode') {
-      state.anchors.mode = target.value as InputMode;
-      render();
-    }
+  // Composition committed — render once to reflect the final character.
+  document.addEventListener('compositionend', () => {
+    render();
   });
 
   document.addEventListener('keydown', (event) => {
@@ -785,7 +803,11 @@ function wireEvents(): void {
       if (tabId) {
         state.activeTab = tabId;
         render();
-        tabs[nextIndex]?.focus();
+        // render() rebuilds the DOM, so the old tab nodes are detached. Focus the
+        // freshly rendered tab by id (selection follows focus, per the ARIA tabs
+        // automatic-activation pattern). preventScroll matches render()'s own
+        // focus restore so keyboard navigation doesn't jerk the viewport.
+        document.getElementById(`tab-${tabId}`)?.focus({ preventScroll: true });
       }
     }
   });
