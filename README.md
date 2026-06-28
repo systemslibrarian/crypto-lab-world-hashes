@@ -1,28 +1,58 @@
 # crypto-lab-world-hashes
 
-## 1. What It Is
+## What It Is
 
 World Hashes demonstrates three national cryptographic hash standards — SM3 (China, OSCCA, 2010), Streebog (Russia, FSB, 2012), and Kupyna (Ukraine, 2014) — alongside SHA-256 and SHA-3 as reference anchors. Each national hash was developed for cryptographic sovereignty: to reduce dependence on U.S.-designed primitives for government and regulated-industry use. The security model is collision-resistant one-way function: given a hash output, finding the input or a second input with the same hash must be computationally infeasible.
 
-## 2. When to Use It
+## When to Use It
 
-- ✅ SM3: Required for Chinese PKI, Chinese TLS (TLCP), and products under Chinese Cryptography Law — pairs with SM2 signatures
-- ✅ Streebog-256/512: Required for Russian GOST R 34.11-2012 compliance — pairs with GOST elliptic curve signatures
-- ✅ Kupyna-256/512: Required for Ukrainian DSTU 7564:2014 compliance
-- ✅ SHA-256: General-purpose default for all other use cases
-- ✅ SHA-3: Preferred for new protocol designs or when sponge security matters
-- ❌ Do not use Streebog outside Russian compliance requirements — shared S-box transparency concerns with Kuznyechik apply
-- ❌ Do not use any of these as a MAC without HMAC wrapping
+- SM3: Required for Chinese PKI, Chinese TLS (TLCP), and products under Chinese Cryptography Law — pairs with SM2 signatures.
+- Streebog-256/512: Required for Russian GOST R 34.11-2012 compliance — pairs with GOST elliptic curve signatures.
+- Kupyna-256/512: Required for Ukrainian DSTU 7564:2014 compliance.
+- SHA-256: General-purpose default for all other use cases.
+- SHA-3: Preferred for new protocol designs or when sponge security matters.
+- Do not use Streebog outside Russian compliance requirements — shared S-box transparency concerns with Kuznyechik apply.
+- Do not use any of these as a MAC without HMAC wrapping.
+- Do NOT treat this as a production crypto library — it is a teaching demo for comparing national hash standards, not a hardened deployment.
 
-## 3. Live Demo
+## Live Demo
 
-Link: https://systemslibrarian.github.io/crypto-lab-world-hashes/
+**[systemslibrarian.github.io/crypto-lab-world-hashes](https://systemslibrarian.github.io/crypto-lab-world-hashes/)**
 
-Five exhibits: SM3 with SHA-256 side-by-side and construction comparison, Streebog with S-box controversy documentation, Kupyna with geopolitical context and sponge construction comparison, SHA-256 and SHA-3 as reference anchors with five-way simultaneous hashing, and a full five-way comparison table with decision tree.
+Five exhibits: SM3 with SHA-256 side-by-side and construction comparison, Streebog with S-box controversy documentation, Kupyna with geopolitical context and sponge construction comparison, SHA-256 and SHA-3 as reference anchors with five-way simultaneous hashing, and a full five-way comparison table with decision tree. All hash outputs are real — no simulation. Every digest is produced in your browser by [`src/hashes.ts`](src/hashes.ts), the same module the test suite checks. Each exhibit shows a **visual avalanche diff** (changed hex nibbles highlighted, with bit-diffusion percentage against the ideal ~50%) and a live **input byte-length** readout. Nothing is sent to a server — all hashing is local.
 
-All hash outputs are real — no simulation. Every digest is produced in your browser by [`src/hashes.ts`](src/hashes.ts), the same module the test suite checks. Each exhibit shows a **visual avalanche diff** (changed hex nibbles highlighted, with bit-diffusion percentage against the ideal ~50%) and a live **input byte-length** readout. Nothing is sent to a server — all hashing is local.
+## What Can Go Wrong
 
-## 3a. Verified Correctness
+- Using a raw Merkle–Damgård hash (SM3, SHA-256, Streebog) directly as a MAC is vulnerable to length-extension; wrap it in HMAC instead.
+- Streebog and Kuznyechik share S-box transparency concerns, so deploying Streebog outside its compliance mandate inherits an unresolved design-trust question.
+- Reaching for a national hash outside its regulatory requirement trades SHA-2/SHA-3 scrutiny and tooling for weaker ecosystem support with no security gain.
+- Collision and second-preimage resistance are assumptions, not guarantees; truncating a digest or misusing it for password storage (no salt/KDF) undermines the intended security.
+- Mismatched variants (e.g. confusing the 256-bit and 512-bit outputs, or differing byte/endianness conventions between standards) break interoperability between implementations.
+
+## Real-World Usage
+
+- SM3 underpins Chinese PKI, Chinese TLS (TLCP), and products under Chinese Cryptography Law, paired with SM2 signatures.
+- Streebog-256/512 is mandated for Russian GOST R 34.11-2012 compliance, paired with GOST elliptic-curve signatures.
+- Kupyna-256/512 is required for Ukrainian DSTU 7564:2014 compliance.
+- SHA-256 (FIPS 180-4) remains the general-purpose default across the internet, with SHA-3 (FIPS 202) preferred for new sponge-based designs.
+
+## How to Run Locally
+
+```bash
+git clone https://github.com/systemslibrarian/crypto-lab-world-hashes
+cd crypto-lab-world-hashes
+npm install
+npm run dev
+```
+
+## Related Demos
+- [crypto-lab-world-ciphers](https://systemslibrarian.github.io/crypto-lab-world-ciphers/) — the encryption counterpart: Camellia, ARIA, SM4, and Kuznyechik national block ciphers.
+- [crypto-lab-hash-zoo](https://systemslibrarian.github.io/crypto-lab-hash-zoo/) — SHA-256, SHA3-256, BLAKE3, and the Merkle–Damgård construction explained.
+- [crypto-lab-babel-hash](https://systemslibrarian.github.io/crypto-lab-babel-hash/) — interactive SHA-256, SHA3-256, BLAKE3, and HMAC.
+- [crypto-lab-mac-race](https://systemslibrarian.github.io/crypto-lab-mac-race/) — HMAC, CMAC, Poly1305, and GHASH: turning hashes into authenticators.
+- [crypto-lab-merkle-vault](https://systemslibrarian.github.io/crypto-lab-merkle-vault/) — Merkle trees and inclusion proofs built on a hash function.
+
+## Verified Correctness
 
 The hero shows a live self-test badge (e.g. `✓ 17/17 test vectors verified`). On every page load the app recomputes published **known-answer test vectors** and compares them byte-for-byte against the values in each algorithm's defining standard:
 
@@ -42,22 +72,13 @@ npm run test:watch
 npm run typecheck
 ```
 
-## 3b. Accessibility
+## Accessibility
 
 The lab is built to WCAG 2.1 AA: semantic landmarks and a skip link, the full ARIA tab pattern with arrow/Home/End keyboard navigation, visible focus rings, focus and caret preserved across re-renders, `scope`-annotated data tables, `prefers-reduced-motion` support, and a `<noscript>` fallback. Avalanche highlights carry three independent cues (colour, background, underline) so they never rely on colour alone, and colour contrast meets AA in both themes.
 
 `npm test` runs an automated axe-core scan (WCAG 2 A/AA) against the rendered app in both themes on every push. Layout-dependent colour-contrast is verified separately, since a headless DOM has no rendering engine.
 
-## 4. How to Run Locally
-
-```bash
-git clone https://github.com/systemslibrarian/crypto-lab-world-hashes
-cd crypto-lab-world-hashes
-npm install
-npm run dev
-```
-
-## 5. GitHub Pages Setup
+## GitHub Pages Setup
 
 This project is configured for automatic Pages deploy from GitHub Actions.
 
@@ -72,10 +93,8 @@ Manual deploy is also available:
 npm run deploy
 ```
 
-## 6. Part of the Crypto-Lab Suite
-
-Part of [crypto-lab](https://systemslibrarian.github.io/crypto-lab/) — browser-based cryptography demos spanning 2,500 years of cryptographic history to NIST FIPS 2024 post-quantum standards.
-
 ---
 
-*So whether you eat or drink or whatever you do, do it all for the glory of God. — 1 Corinthians 10:31*
+*One of 60+ browser demos in the [Crypto Lab](https://crypto-lab.systemslibrarian.dev/) suite.*
+
+*"So whether you eat or drink or whatever you do, do it all for the glory of God." — 1 Corinthians 10:31*
