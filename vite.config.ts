@@ -1,5 +1,10 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  base: '/crypto-lab-world-hashes/'
+  base: '/crypto-lab-world-hashes/',
+  // Scope vitest to unit tests; e2e/*.spec.ts belongs to Playwright, which
+  // would otherwise be swept up by vitest's default include glob.
+  test: {
+    include: ['src/**/*.test.ts'],
+  },
 });
