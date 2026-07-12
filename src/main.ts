@@ -656,19 +656,27 @@ function render(): void {
 
   app.innerHTML = `
     <main class="app-shell" id="main-content">
-      <header class="hero">
+      <header class="cl-hero">
         <button class="theme-toggle" id="theme-toggle" aria-label="${toggleLabel}" title="${toggleLabel}">${toggleEmoji}</button>
-        <div class="hero-badges">
-          <span class="badge">National Hash Standards</span>
-          <span class="badge">SM3 · Streebog · Kupyna</span>
-          <span class="badge">SHA-256 · SHA-3 Reference</span>
-          ${verificationBadge()}
+        <div class="cl-hero-main">
+          <h1 class="cl-hero-title">World Hashes</h1>
+          <p class="cl-hero-sub">SM3 · Streebog · Kupyna · SHA-256 · SHA-3</p>
+          <p class="cl-hero-desc">
+            Hash the same input with three national standards and the SHA anchors side by side, and watch the avalanche effect flip half the output bits from a one-bit change.
+          </p>
+          <div class="hero-badges">
+            <span class="badge">National Hash Standards</span>
+            <span class="badge">SM3 · Streebog · Kupyna</span>
+            <span class="badge">SHA-256 · SHA-3 Reference</span>
+            ${verificationBadge()}
+          </div>
         </div>
-        <h1>crypto-lab-world-hashes</h1>
-        <p>
-          SHA-256 and SHA-3 are global defaults, but nations also standardize domestic hashes for sovereignty and regulation.
-          This lab compares SM3, Streebog, and Kupyna side by side with real digest output.
-        </p>
+        <aside class="cl-hero-why" aria-label="Why it matters">
+          <span class="cl-hero-why-label">WHY IT MATTERS</span>
+          <p class="cl-hero-why-text">
+            SHA-256 and SHA-3 dominate globally, yet China, Russia, and Ukraine mandate their own hashes for regulated systems. Knowing them is what lets you build, audit, or interoperate across sovereign compliance regimes.
+          </p>
+        </aside>
       </header>
 
       <nav class="tabs" role="tablist" aria-label="Exhibit tabs">
