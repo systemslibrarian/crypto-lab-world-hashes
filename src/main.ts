@@ -14,16 +14,23 @@ type CopyState = {
 
 const state: {
   activeTab: TabId;
-  sm3: { input: string; mode: InputMode };
+  intro: { input: string };
+  sm3: { input: string; mode: InputMode; flip: number | null };
   streebog: { input: string; mode: InputMode; size: DigestSize };
   kupyna: { input: string; mode: InputMode; size: DigestSize };
   anchors: { input: string; mode: InputMode };
   copyState: CopyState;
 } = {
   activeTab: 'sm3',
+  intro: {
+    input: 'hash me'
+  },
   sm3: {
     input: 'Sovereign standards still need strong engineering discipline.',
-    mode: 'text'
+    mode: 'text',
+    // Index of the character the learner has chosen to flip in the avalanche
+    // demo. null = flip the last character (the default, one-character edit).
+    flip: null
   },
   streebog: {
     input: 'Compliance can force algorithm choice even when trust is debated.',
@@ -115,6 +122,44 @@ function mutateInput(input: string, mode: InputMode): string {
   const firstNibble = normalized[0];
   const replacement = firstNibble === '0' ? '1' : '0';
   return `${replacement}${normalized.slice(1)}`;
+}
+
+/**
+ * Flip exactly one character of `input` at `index` (default: the last character),
+ * returning the mutated string. Used by the interactive avalanche demo so the
+ * learner picks which single character changes and watches the digest re-scramble.
+ * The replacement is deterministic and always differs from the original char.
+ */
+function flipCharAt(input: string, index: number | null): { mutated: string; index: number } {
+  if (input.length === 0) {
+    return { mutated: 'a', index: 0 };
+  }
+  const i = index === null || index < 0 || index >= input.length ? input.length - 1 : index;
+  const c = input[i];
+  // Nudge to a visibly different, still-printable character. Letters toggle
+  // case-ish (a<->b, others +1); everything else flips to '#'/'~'.
+  const replacement = c === 'a' ? 'b' : c === 'A' ? 'B' : c === ' ' ? '_' : c === '#' ? '~' : '#';
+  return { mutated: `${input.slice(0, i)}${replacement}${input.slice(i + 1)}`, index: i };
+}
+
+/**
+ * A clickable strip of the input characters. Clicking a character selects it as
+ * the single byte to flip; the currently-flipped one is marked. Keyboard users
+ * get real <button>s. This turns the avalanche from a pre-baked readout into
+ * something the learner causes themselves.
+ */
+function flipStrip(input: string, flipIndex: number): string {
+  const chars = Array.from(input);
+  const cells = chars
+    .map((c, i) => {
+      const display = c === ' ' ? '␣' : escapeHtml(c);
+      const selected = i === flipIndex;
+      return `<button type="button" class="flip-cell${selected ? ' flip-cell-active' : ''}"
+        data-flip-index="${i}" aria-pressed="${selected}"
+        aria-label="Flip character ${i + 1}${c === ' ' ? ' (space)' : `: ${c}`}">${display}</button>`;
+    })
+    .join('');
+  return `<div class="flip-strip" role="group" aria-label="Click a character to flip it">${cells}</div>`;
 }
 
 // Thin wrappers over the single hashing source of truth in ./hashes, so the
@@ -253,6 +298,219 @@ function verificationPanel(): string {
   `;
 }
 
+/**
+ * Inline jargon gloss. Wraps a term in a native <abbr> with a title tooltip and
+ * a dotted underline cue, so the definition is one hover/long-press away and is
+ * also read by screen readers via the expanded title. Definitions are kept to
+ * one plain-English line — the full contrast lives in "Constructions 101".
+ */
+const GLOSSARY: Record<string, string> = {
+  'Merkle-Damgard':
+    'Merkle–Damgård: build a hash by splitting the message into fixed blocks and chaining each block through a compression function, carrying a running state forward.',
+  'Merkle–Damgård':
+    'Merkle–Damgård: build a hash by splitting the message into fixed blocks and chaining each block through a compression function, carrying a running state forward.',
+  sponge:
+    'Sponge: absorb the message into one big internal state a few bytes at a time, then squeeze the digest back out of that state. The state is larger than the output, so the final chaining value is never exposed.',
+  'wide-pipe':
+    'Wide-pipe: keep an internal state that is wider (more bits) than the final digest, then truncate at the end. The extra width makes internal collisions harder to reach.',
+  'S-box':
+    'S-box (substitution box): a small fixed lookup table that non-linearly scrambles bytes. Its internal structure is a classic place to hide — or accidentally leak — weaknesses.',
+  'Miyaguchi-Preneel':
+    'Miyaguchi–Preneel: a standard recipe for turning a block cipher into a compression function by XOR-mixing the input block, the cipher output, and the previous state.',
+  'Keccak-f[1600]':
+    'Keccak-f[1600]: the 1600-bit permutation at the heart of SHA-3 — 24 rounds of five steps (θ, ρ, π, χ, ι) that stir the whole sponge state.',
+  'length-extension':
+    'Length-extension: given only H(secret‖message) and the length, an attacker can compute H(secret‖message‖padding‖extra) without knowing the secret — a Merkle–Damgård hazard sponges avoid.'
+};
+
+function gloss(term: string, display?: string): string {
+  const def = GLOSSARY[term];
+  const shown = display ?? term;
+  if (!def) return escapeHtml(shown);
+  return `<abbr class="gloss" tabindex="0" title="${escapeHtml(def)}">${escapeHtml(shown)}</abbr>`;
+}
+
+/**
+ * Exhibit 0 — the ground floor. Defines what a hash IS in plain language and
+ * demonstrates all four properties live: the learner types anything and watches
+ * the digest stay a fixed length while looking random and one-way. Every later
+ * exhibit is anchored to this baseline.
+ */
+function renderIntroExhibit(): string {
+  const bytes = encoder.encode(state.intro.input);
+  const digest = sha256Hex(bytes);
+  // Second live digest of a near-identical input, to show determinism +
+  // unpredictability at once: same input → identical digest; tiny change → total scramble.
+  const nudged = state.intro.input + '!';
+  const nudgedDigest = sha256Hex(encoder.encode(nudged));
+  const nudgedDiff = changedHexBits(digest, nudgedDigest);
+  const nudgedPct = ((nudgedDiff / 256) * 100).toFixed(0);
+  const n = bytes.length;
+
+  return `
+    <section class="panel intro-panel" aria-labelledby="intro-heading">
+      <h2 id="intro-heading">Start here — what is a cryptographic hash?</h2>
+      <p class="small muted" style="max-width:70ch;">
+        Everything below compares national <em>hash functions</em>. A cryptographic hash is a
+        function that takes any input — a word, a file, a whole disk image — and returns a short
+        fixed-size fingerprint called a <strong>digest</strong>. Four properties make it useful:
+      </p>
+      <div class="grid-2 prop-grid">
+        <div class="prop-card"><span class="prop-tag">1 · Deterministic</span>
+          <p class="small">The same input always gives the same digest. Hash it twice, get the same fingerprint — that is how you verify a download.</p></div>
+        <div class="prop-card"><span class="prop-tag">2 · Fixed length</span>
+          <p class="small">One byte or one gigabyte in, the digest is always the same size (256 bits here). The output length never grows with the input.</p></div>
+        <div class="prop-card"><span class="prop-tag">3 · One-way</span>
+          <p class="small">Easy to go input → digest, infeasible to go back. Given a digest, you cannot recover the input — the fingerprint reveals nothing about it.</p></div>
+        <div class="prop-card"><span class="prop-tag">4 · Collision-resistant</span>
+          <p class="small">No one can find two different inputs with the same digest. That is what lets a digest stand in for the data it fingerprints.</p></div>
+      </div>
+
+      <div class="intro-live">
+        <label for="intro-input">Try it — type anything and watch the four properties hold</label>
+        <textarea id="intro-input" rows="2" aria-describedby="intro-live-note">${escapeHtml(state.intro.input)}</textarea>
+        <p id="intro-live-note" class="live-note"><span class="live-dot" aria-hidden="true"></span>Hashed live with SHA-256 in your browser.</p>
+        <div class="card" role="status" aria-live="polite">
+          <div class="result-header"><strong>SHA-256 digest</strong>
+            <span class="badge fixed-len-badge">always 256 bits · 64 hex chars</span></div>
+          <div class="digest-block">${digest}</div>
+          <p class="small muted" style="margin:.4rem 0 0;">
+            Your input is <strong>${n}</strong> ${n === 1 ? 'byte' : 'bytes'} (${n * 8} bits), yet the digest is
+            <strong>always 256 bits</strong> — property 2. Type more and it will not get longer.
+          </p>
+        </div>
+        <div class="card" style="margin-top:.7rem;">
+          <div class="result-header"><strong>Now add one character:</strong> <code>${escapeHtml(nudged)}</code></div>
+          <div class="digest-block">${diffDigestHtml(digest, nudgedDigest)}</div>
+          <p class="small muted" style="margin:.4rem 0 0;">
+            One extra <code>!</code> scrambled <strong>${nudgedDiff}/256</strong> bits (${nudgedPct}%) — the digest looks
+            unrelated (one-wayness in action, property 3), yet re-typing the exact same text always returns the exact
+            same fingerprint (property 1).
+          </p>
+        </div>
+      </div>
+
+      <details class="explainer">
+        <summary>Why can't I just reverse it? (one-wayness &amp; collisions)</summary>
+        <p class="small">
+          A 256-bit digest has 2<sup>256</sup> possible values — more than there are atoms in the observable universe.
+          Because the output is far smaller than the space of possible inputs, <em>collisions must exist</em> in theory,
+          but the security goal is that no one can <strong>find</strong> one, nor find any input that maps to a chosen
+          digest. Searching for a matching input by brute force would take longer than the age of the universe, which is
+          exactly why a digest can safely stand in for the data. That is the property every algorithm below is judged on.
+        </p>
+      </details>
+    </section>
+  `;
+}
+
+/**
+ * Merkle–Damgård mechanism diagram: message blocks M1..M3 flow into a
+ * compression function f, each chaining the previous state forward (IV → h1 →
+ * h2 → digest). The final state IS the digest — highlighted to motivate why
+ * length-extension is possible. This is a labelled SVG, not decoration: it
+ * shows the actual data flow the prose describes.
+ */
+function mdDiagram(): string {
+  return `
+    <figure class="mech" role="group" aria-label="Merkle–Damgård construction: message blocks chained through a compression function">
+      <svg viewBox="0 0 640 150" class="mech-svg" role="img"
+        aria-label="Three message blocks M1, M2, M3 each feed a compression function f. Each f also takes the previous chaining state, starting from the initialization vector, and outputs the next state. The final state after the last block is the digest and is exposed.">
+        <defs>
+          <marker id="md-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g class="mech-flow" font-size="13" text-anchor="middle">
+          <!-- IV -->
+          <rect class="mech-state" x="6" y="58" width="56" height="34" rx="6"/>
+          <text x="34" y="80">IV</text>
+          <!-- three f stages -->
+          <g>
+            <rect class="mech-msg" x="86" y="10" width="70" height="30" rx="6"/><text x="121" y="30">M1</text>
+            <rect class="mech-f" x="86" y="56" width="70" height="38" rx="8"/><text x="121" y="80">f</text>
+            <line class="mech-line" x1="62" y1="75" x2="86" y2="75" marker-end="url(#md-arrow)"/>
+            <line class="mech-line" x1="121" y1="40" x2="121" y2="56" marker-end="url(#md-arrow)"/>
+          </g>
+          <g>
+            <rect class="mech-msg" x="216" y="10" width="70" height="30" rx="6"/><text x="251" y="30">M2</text>
+            <rect class="mech-f" x="216" y="56" width="70" height="38" rx="8"/><text x="251" y="80">f</text>
+            <line class="mech-line" x1="156" y1="75" x2="216" y2="75" marker-end="url(#md-arrow)"/>
+            <text x="186" y="70" class="mech-tag">h1</text>
+            <line class="mech-line" x1="251" y1="40" x2="251" y2="56" marker-end="url(#md-arrow)"/>
+          </g>
+          <g>
+            <rect class="mech-msg" x="346" y="10" width="70" height="30" rx="6"/><text x="381" y="30">M3</text>
+            <rect class="mech-f" x="346" y="56" width="70" height="38" rx="8"/><text x="381" y="80">f</text>
+            <line class="mech-line" x1="286" y1="75" x2="346" y2="75" marker-end="url(#md-arrow)"/>
+            <text x="316" y="70" class="mech-tag">h2</text>
+          </g>
+          <!-- exposed digest -->
+          <line class="mech-line" x1="416" y1="75" x2="470" y2="75" marker-end="url(#md-arrow)"/>
+          <rect class="mech-digest" x="472" y="56" width="120" height="38" rx="8"/>
+          <text x="532" y="80">digest = state</text>
+        </g>
+      </svg>
+      <figcaption class="small muted">
+        Blocks chain left-to-right; each compression <code>f</code> mixes a message block into the running state.
+        The <strong>final state is handed out as the digest</strong> — so an attacker who knows it can keep chaining,
+        which is the ${gloss('length-extension')} weakness.
+      </figcaption>
+    </figure>
+  `;
+}
+
+/**
+ * Sponge mechanism diagram: bytes are absorbed into a large state split into an
+ * outer "rate" and a hidden "capacity", stirred by a permutation, then squeezed
+ * out as the digest. The capacity is never output — visually the reason sponges
+ * resist length-extension.
+ */
+function spongeDiagram(): string {
+  return `
+    <figure class="mech" role="group" aria-label="Sponge construction: absorb bytes into a wide state, then squeeze out the digest">
+      <svg viewBox="0 0 640 170" class="mech-svg" role="img"
+        aria-label="Message bytes are absorbed into the outer rate part of a wide state and stirred by a permutation P across several rounds. The inner capacity part is never exposed. The digest is then squeezed out of the rate. Because the capacity stays hidden, the final state is not revealed.">
+        <defs>
+          <marker id="sp-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-size="13" text-anchor="middle">
+          <!-- absorb inputs -->
+          <rect class="mech-msg" x="8" y="20" width="60" height="26" rx="6"/><text x="38" y="38">bytes</text>
+          <line class="mech-line" x1="68" y1="33" x2="110" y2="33" marker-end="url(#sp-arrow)"/>
+          <text x="120" y="14" class="mech-tag">absorb</text>
+          <!-- state: rate + capacity, two permutation stages -->
+          <g>
+            <rect class="mech-rate" x="110" y="20" width="80" height="30" rx="5"/><text x="150" y="40">rate</text>
+            <rect class="mech-cap" x="110" y="52" width="80" height="46" rx="5"/><text x="150" y="80" class="mech-cap-t">capacity</text>
+            <rect class="mech-perm" x="200" y="20" width="46" height="78" rx="8"/><text x="223" y="63">P</text>
+            <line class="mech-line" x1="190" y1="59" x2="200" y2="59" marker-end="url(#sp-arrow)"/>
+          </g>
+          <g>
+            <rect class="mech-rate" x="256" y="20" width="80" height="30" rx="5"/><text x="296" y="40">rate</text>
+            <rect class="mech-cap" x="256" y="52" width="80" height="46" rx="5"/><text x="296" y="80" class="mech-cap-t">capacity</text>
+            <rect class="mech-perm" x="346" y="20" width="46" height="78" rx="8"/><text x="369" y="63">P</text>
+            <line class="mech-line" x1="336" y1="59" x2="346" y2="59" marker-end="url(#sp-arrow)"/>
+          </g>
+          <!-- squeeze -->
+          <text x="440" y="14" class="mech-tag">squeeze</text>
+          <line class="mech-line" x1="392" y1="35" x2="430" y2="35" marker-end="url(#sp-arrow)"/>
+          <rect class="mech-digest" x="432" y="20" width="120" height="30" rx="6"/><text x="492" y="40">digest</text>
+          <line class="mech-line" x1="392" y1="75" x2="430" y2="75"/>
+          <text x="500" y="79" class="mech-cap-t">capacity stays hidden</text>
+        </g>
+      </svg>
+      <figcaption class="small muted">
+        Bytes are absorbed into the <strong>rate</strong> and stirred by permutation <code>P</code>; the
+        <strong>capacity</strong> half is never output. Because the full state is never revealed, there is nothing to
+        extend — sponges resist ${gloss('length-extension')} by construction.
+      </figcaption>
+    </figure>
+  `;
+}
+
 function renderSm3Exhibit(): string {
   const parsed = parseInput(state.sm3.input, state.sm3.mode);
   if (!parsed.ok) {
@@ -260,7 +518,19 @@ function renderSm3Exhibit(): string {
   }
 
   const original = parsed.bytes;
-  const mutatedInput = mutateInput(state.sm3.input, state.sm3.mode);
+  // Interactive avalanche: the learner picks which single character to flip (or
+  // the last one by default). In hex mode we fall back to the automatic
+  // one-nibble flip since there is no clean per-character strip for raw hex.
+  const interactive = state.sm3.mode === 'text';
+  let mutatedInput: string;
+  let flipIndex = 0;
+  if (interactive) {
+    const flip = flipCharAt(state.sm3.input, state.sm3.flip);
+    mutatedInput = flip.mutated;
+    flipIndex = flip.index;
+  } else {
+    mutatedInput = mutateInput(state.sm3.input, state.sm3.mode);
+  }
   const mutatedParsed = parseInput(mutatedInput, state.sm3.mode);
   if (!mutatedParsed.ok) {
     return `<div class="panel"><h2>Exhibit 1 — SM3 (China)</h2><p class="callout warn">${mutatedParsed.error}</p></div>`;
@@ -277,8 +547,26 @@ function renderSm3Exhibit(): string {
         <h2>Exhibit 1 — SM3 (China)</h2>
         <p class="muted small">
           <strong>SM3</strong> is standardized in <strong>GM/T 0004-2012</strong>, <strong>GB/T 32905-2016</strong>, and ISO/IEC 10118-3.
-          It is a 256-bit Merkle-Damgard hash with a 512-bit message block and 64 rounds.
+          It is a 256-bit ${gloss('Merkle-Damgard', 'Merkle–Damgård')} hash with a 512-bit message block and 64 rounds —
+          the same block-chaining family as SHA-256.
         </p>
+        <details class="explainer">
+          <summary>Constructions 101 — Merkle–Damgård vs sponge (the distinction this whole demo turns on)</summary>
+          <div class="constr-101">
+            <div>
+              <strong>Merkle–Damgård</strong> (SM3, SHA-256, Streebog): chop the message into fixed
+              blocks and chain each one through a <em>compression function</em>, carrying a running
+              state forward. Simple and fast — but the final state <em>is</em> the digest, which
+              exposes it to ${gloss('length-extension')}.
+            </div>
+            <div>
+              <strong>Sponge</strong> (Kupyna, SHA-3): ${gloss('sponge', 'absorb')} the message into one
+              big internal state a few bytes at a time, then <em>squeeze</em> the digest out of it.
+              The state is wider than the output, so the final chaining value is never revealed —
+              which is why sponges are immune to length-extension by construction.
+            </div>
+          </div>
+        </details>
         <label for="sm3-mode">Input mode</label>
         <select id="sm3-mode">
           <option value="text" ${state.sm3.mode === 'text' ? 'selected' : ''}>Text</option>
@@ -292,19 +580,9 @@ function renderSm3Exhibit(): string {
         <div id="sm3-sha-result">${hashRow('SHA-256 (256-bit)', shaDigest, 'sha256')}</div>
       </div>
       <div class="panel">
-        <h3>Construction comparison: SM3 vs SHA-256</h3>
-        <div class="diagram">
-          <div class="diagram-row">
-            <div class="diagram-node">SM3: 512-bit block</div>
-            <div class="diagram-arrow">→</div>
-            <div class="diagram-node">SM3 compression (64 rounds, distinct expansion)</div>
-          </div>
-          <div class="diagram-row">
-            <div class="diagram-node">SHA-256: 512-bit block</div>
-            <div class="diagram-arrow">→</div>
-            <div class="diagram-node">SHA-256 compression (64 rounds, SSIG schedule)</div>
-          </div>
-        </div>
+        <h3>How Merkle–Damgård actually works (SM3 &amp; SHA-256)</h3>
+        <p class="small muted">Both hash the same way: split the message into 512-bit blocks and chain them through a compression function over 64 rounds. SM3 uses a distinct message expansion; SHA-256 uses its SSIG schedule — but the data flow is identical:</p>
+        ${mdDiagram()}
         <div class="callout" style="margin-top: 0.8rem;">
           <strong>Design transparency note:</strong> SM3 design rationale is partially published. Wang Xiaoyun's team has strong cryptanalytic credibility,
           but full design criteria are not as openly documented as the AES process.
@@ -316,8 +594,14 @@ function renderSm3Exhibit(): string {
       </div>
     </div>
     <div class="panel" style="margin-top: 1rem;">
-      <h3>Avalanche demo (single-character change)</h3>
-      <p class="small muted">Original input: <code>${escapeHtml(state.sm3.input)}</code></p>
+      <h3>Avalanche demo — flip one character yourself</h3>
+      <p class="small muted" style="max-width:72ch;">
+        A good hash makes a 1-bit input change and a completely different digest indistinguishable from random.
+        ${interactive
+          ? 'Click any character below to flip it, then watch which output nibbles re-scramble and how far the diffusion meter moves.'
+          : 'In hex mode the first nibble is flipped automatically; switch to Text mode to pick the character yourself.'}
+      </p>
+      ${interactive ? flipStrip(state.sm3.input, flipIndex) : ''}
       <p class="small muted">Modified input: <code>${escapeHtml(mutatedInput)}</code> — <span class="nibble-changed">highlighted</span> nibbles differ from the original digest.</p>
       <div class="grid-2">
         ${avalancheCard('SM3', sm3Digest, sm3Mutated, 256)}
@@ -351,7 +635,9 @@ function renderStreebogExhibit(): string {
         <h2>Exhibit 2 — Streebog (Russia)</h2>
         <p class="muted small">
           <strong>GOST R 34.11-2012</strong> (Streebog) replaced GOST R 34.11-94 and defines 256-bit and 512-bit digests.
-          It uses a wide-pipe Merkle-Damgard structure with Miyaguchi-Preneel style compression.
+          It uses a ${gloss('wide-pipe')} ${gloss('Merkle-Damgard', 'Merkle–Damgård')} structure with
+          ${gloss('Miyaguchi-Preneel', 'Miyaguchi–Preneel')}-style compression built from an
+          ${gloss('S-box')}-based block cipher — so like SM3 it chains blocks forward, but keeps a wider internal state.
         </p>
         <label for="streebog-mode">Input mode</label>
         <select id="streebog-mode">
@@ -371,9 +657,9 @@ function renderStreebogExhibit(): string {
         ${hashRow(currentSize === 256 ? 'SHA-256' : 'SHA-512', referenceDigest, `streebog-ref-${currentSize}`)}
       </div>
       <div class="panel">
-        <h3>Mandatory S-box connection note</h3>
+        <h3>Mandatory ${gloss('S-box')} connection note</h3>
         <div class="callout warn">
-          Streebog uses the same S-box as Kuznyechik. In 2019, Léo Perrin and co-authors documented hidden structure in that S-box inconsistent
+          Streebog uses the same ${gloss('S-box')} as Kuznyechik. In 2019, Léo Perrin and co-authors documented hidden structure in that S-box inconsistent
           with random generation. The same S-box controversy from Kuznyechik applies here. Use Streebog only when Russian GOST R 34.11-2012 compliance requires it.
         </div>
         <p class="small">
@@ -421,7 +707,8 @@ function renderKupynaExhibit(): string {
         <h2>Exhibit 3 — Kupyna (Ukraine)</h2>
         <p class="muted small">
           <strong>DSTU 7564:2014</strong> defines Kupyna as Ukraine's national hash standard with 256-bit and 512-bit variants.
-          It uses a permutation-driven sponge-like wide-pipe design instead of Merkle-Damgard chaining.
+          It uses a permutation-driven ${gloss('sponge')}-like ${gloss('wide-pipe')} design instead of
+          ${gloss('Merkle-Damgard', 'Merkle–Damgård')} chaining — the message is absorbed into a wide state, not chained block-by-block.
         </p>
         <label for="kupyna-mode">Input mode</label>
         <select id="kupyna-mode">
@@ -441,12 +728,14 @@ function renderKupynaExhibit(): string {
         ${hashRow(currentSize === 256 ? 'SHA-3-256' : 'SHA-3-512', sha3Digest, `kupyna-ref-${currentSize}`)}
       </div>
       <div class="panel">
-        <h3>Construction distinction panel</h3>
-        <ul>
-          <li>Kupyna and SHA-3 both use permutation-based sponge families.</li>
+        <h3>How a sponge works (Kupyna &amp; SHA-3)</h3>
+        <p class="small muted">Instead of chaining blocks, a sponge absorbs the message into one wide state, then squeezes the digest out. The hidden capacity half is never exposed:</p>
+        ${spongeDiagram()}
+        <ul class="small">
+          <li>Both Kupyna and SHA-3 are permutation-based ${gloss('sponge')} families.</li>
           <li>Kupyna uses a dedicated permutation (10 rounds in its base round structure).</li>
-          <li>SHA-3 uses Keccak-f[1600] with 24 rounds of theta, rho, pi, chi, and iota.</li>
-          <li>Kupyna emphasizes efficient hardware and 64-bit software implementation without lookup tables.</li>
+          <li>SHA-3 uses ${gloss('Keccak-f[1600]')} with 24 rounds of θ (theta), ρ (rho), π (pi), χ (chi), and ι (iota).</li>
+          <li>Kupyna targets efficient hardware and 64-bit software without large lookup tables.</li>
         </ul>
         <div class="callout">
           <strong>Geopolitical context:</strong> DSTU 7564:2014 was standardized in the same year Russia annexed Crimea.
@@ -526,8 +815,8 @@ function renderAnchorsExhibit(): string {
       <div class="panel">
         <h3>Reference summary</h3>
         <ul>
-          <li><strong>SHA-256</strong> — FIPS 180-4, Merkle-Damgard, 64 rounds, widely deployed in TLS and software signing.</li>
-          <li><strong>SHA-3</strong> — FIPS 202, sponge construction over Keccak-f[1600], 24 rounds, open competition lineage.</li>
+          <li><strong>SHA-256</strong> — FIPS 180-4, ${gloss('Merkle-Damgard', 'Merkle–Damgård')}, 64 rounds, widely deployed in TLS and software signing.</li>
+          <li><strong>SHA-3</strong> — FIPS 202, ${gloss('sponge')} construction over ${gloss('Keccak-f[1600]')}, 24 rounds, open competition lineage.</li>
         </ul>
       </div>
     </div>
@@ -570,10 +859,26 @@ function renderDecisionExhibit(): string {
             <tr><th scope="row">Design transparency</th><td>Partial</td><td>S-box opaque concern</td><td>Published</td><td>Published</td><td>Published</td></tr>
             <tr><th scope="row">Known practical breaks</th><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td></tr>
             <tr><th scope="row">Use when</th><td>China compliance</td><td>Russian GOST compliance</td><td>Ukrainian DSTU compliance</td><td>General use</td><td>New designs</td></tr>
-            <tr><th scope="row">Trust level</th><td>Medium-High</td><td>Use with caution</td><td>High</td><td>High</td><td>High</td></tr>
+            <tr><th scope="row">Trust level <span class="editorial-tag" title="Author's editorial judgment, not a measurement">opinion<sup>†</sup></span></th>
+              <td>Medium-High<sup>a</sup></td><td>Use with caution<sup>b</sup></td><td>High<sup>c</sup></td><td>High<sup>d</sup></td><td>High<sup>d</sup></td></tr>
           </tbody>
         </table>
       </div>
+      <p class="small muted" style="margin:.6rem 0 0;">
+        <sup>†</sup> <strong>Trust level is editorial opinion, not a measured quantity.</strong> Every column above it
+        (construction, output size, standardization) is a fact; these grades are one engineer's read of the published
+        cryptanalysis and design transparency. Reasonable experts differ. The reasoning behind each:
+      </p>
+      <details class="explainer" style="margin-top:.5rem;">
+        <summary>How each trust grade was derived</summary>
+        <ul class="small trust-notes">
+          <li><sup>a</sup> <strong>SM3 — Medium-High.</strong> No practical break; strong cryptanalytic pedigree (Wang Xiaoyun's team). Marked down only because the full design rationale is less openly documented than the AES/SHA-3 competition processes.</li>
+          <li><sup>b</sup> <strong>Streebog — Use with caution.</strong> Perrin et al. (2019) showed the shared Kuznyechik ${gloss('S-box')} has hidden structure inconsistent with random generation. No break follows from it, but unexplained structure in an opaque component is a design-trust red flag outside a compliance mandate.</li>
+          <li><sup>c</sup> <strong>Kupyna — High.</strong> Public design, sponge-style construction (no length-extension), no known practical weakness. Lower ecosystem/tooling maturity than SHA-2/3 is a practical, not a trust, caveat.</li>
+          <li><sup>d</sup> <strong>SHA-256 / SHA-3 — High.</strong> Decades (SHA-256) or an open public competition (SHA-3) of scrutiny, fully published design, ubiquitous tooling.</li>
+        </ul>
+        <p class="small muted">Sources: L. Perrin, "Partitions in the S-Box of Streebog and Kuznyechik" (ToSC 2019); FIPS 180-4; FIPS 202; GM/T 0004-2012; DSTU 7564:2014.</p>
+      </details>
     </div>
     <div class="grid-2" style="margin-top: 1rem;">
       <div class="panel">
@@ -679,6 +984,10 @@ function render(): void {
         </aside>
       </header>
 
+      ${renderIntroExhibit()}
+
+      <p class="section-lead small muted">Now compare how five real standards do it. Each exhibit hashes the same bytes and shows the avalanche effect — a good hash turns a tiny input change into a totally different digest.</p>
+
       <nav class="tabs" role="tablist" aria-label="Exhibit tabs">
         ${tabButtons}
       </nav>
@@ -739,6 +1048,13 @@ function wireEvents(): void {
       return;
     }
 
+    const flip = target.closest<HTMLButtonElement>('[data-flip-index]');
+    if (flip?.dataset.flipIndex) {
+      state.sm3.flip = Number.parseInt(flip.dataset.flipIndex, 10);
+      render();
+      return;
+    }
+
     const copy = target.closest<HTMLButtonElement>('[data-copy-key]');
     if (copy) {
       const key = copy.dataset.copyKey ?? '';
@@ -749,7 +1065,8 @@ function wireEvents(): void {
   });
 
   const inputHandlers: Record<string, (value: string) => void> = {
-    'sm3-input': (v) => { state.sm3.input = v; },
+    'intro-input': (v) => { state.intro.input = v; },
+    'sm3-input': (v) => { state.sm3.input = v; state.sm3.flip = null; },
     'sm3-mode': (v) => { state.sm3.mode = v as InputMode; },
     'streebog-input': (v) => { state.streebog.input = v; },
     'streebog-mode': (v) => { state.streebog.mode = v as InputMode; },

@@ -111,6 +111,45 @@ describe('IME composition safety', () => {
   });
 });
 
+describe('what-is-a-hash intro exhibit', () => {
+  it('renders the four-property intro with a live SHA-256 digest above the tabs', () => {
+    expect(document.getElementById('intro-heading')).not.toBeNull();
+    const intro = document.getElementById('intro-input') as HTMLTextAreaElement;
+    expect(intro).not.toBeNull();
+    // Live digest is a real 256-bit SHA-256 output.
+    const digest = document.querySelector('.intro-live .digest-block');
+    expect(digest?.textContent).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('keeps the digest a fixed 256 bits as the input grows', () => {
+    const intro = document.getElementById('intro-input') as HTMLTextAreaElement;
+    intro.focus();
+    intro.value = 'a much much longer input than before to prove fixed length';
+    intro.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: false }));
+    const digest = document.querySelector('.intro-live .digest-block');
+    // Still exactly 64 hex chars = 256 bits regardless of input length.
+    expect(digest?.textContent).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('user-driven avalanche (flip a character yourself)', () => {
+  it('clicking a character re-scrambles the SM3 mutated digest', () => {
+    tab('sm3').click();
+    const before = document.querySelectorAll('#panel-sm3 .digest-block')[3]?.textContent ?? '';
+    // Flip the first character instead of the default last one.
+    const cell = document.querySelector<HTMLButtonElement>('#panel-sm3 .flip-cell[data-flip-index="0"]');
+    expect(cell).not.toBeNull();
+    cell?.click();
+    // render() rebuilds the strip, so re-query the freshly rendered cell.
+    const reselected = document.querySelector<HTMLButtonElement>('#panel-sm3 .flip-cell[data-flip-index="0"]');
+    expect(reselected?.getAttribute('aria-pressed')).toBe('true');
+    const after = document.querySelectorAll('#panel-sm3 .digest-block')[3]?.textContent ?? '';
+    // A different character was flipped, so the mutated digest must differ.
+    expect(after).not.toBe(before);
+    expect(after).toMatch(/[0-9a-f]/);
+  });
+});
+
 describe('theme toggle', () => {
   it('flips the document theme and persists it', () => {
     document.documentElement.setAttribute('data-theme', 'dark');

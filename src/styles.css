@@ -464,6 +464,245 @@ textarea {
   font-size: 0.88rem;
 }
 
+/* Exhibit 0 — "what is a hash?" intro. */
+.intro-panel {
+  margin-bottom: 1.25rem;
+  border-color: color-mix(in oklab, var(--accent) 32%, var(--border));
+}
+
+.section-lead {
+  max-width: 70ch;
+  margin: 1.25rem 0 0.25rem;
+}
+
+.prop-grid {
+  margin: 0.85rem 0 1rem;
+}
+
+.prop-card {
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--chip);
+}
+
+.prop-card p {
+  margin: 0.35rem 0 0;
+}
+
+.prop-tag {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  color: var(--ink-strong);
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+}
+
+.intro-live {
+  margin-top: 0.5rem;
+}
+
+.fixed-len-badge {
+  background: rgba(83, 209, 139, 0.16);
+  border-color: var(--green);
+  color: var(--ink-strong);
+  font-weight: 600;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* Inline jargon gloss: dotted underline cue + native title tooltip. */
+.gloss {
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--accent);
+  cursor: help;
+  font-variant: inherit;
+}
+
+.gloss:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 0.2rem;
+}
+
+/* Collapsible explainers (Constructions 101, one-wayness, trust notes). */
+.explainer {
+  margin-top: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--chip);
+  padding: 0 0.85rem;
+}
+
+.explainer > summary {
+  cursor: pointer;
+  padding: 0.7rem 0;
+  font-weight: 600;
+  color: var(--ink-strong);
+  list-style-position: inside;
+}
+
+.explainer > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 0.4rem;
+}
+
+.explainer[open] > summary {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.6rem;
+}
+
+.explainer p,
+.explainer ul {
+  margin-top: 0;
+  padding-bottom: 0.7rem;
+}
+
+.constr-101 {
+  display: grid;
+  gap: 0.7rem;
+  padding-bottom: 0.7rem;
+}
+
+.constr-101 > div {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.7rem;
+}
+
+.trust-notes {
+  padding-left: 1.1rem;
+}
+
+.trust-notes li {
+  margin-bottom: 0.4rem;
+}
+
+.editorial-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-strong);
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  border-radius: 999px;
+  padding: 0.02rem 0.4rem;
+  vertical-align: middle;
+}
+
+/* Interactive avalanche: clickable character strip. */
+.flip-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.5rem 0 0.7rem;
+}
+
+.flip-cell {
+  min-width: 1.7rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.95rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.flip-cell:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.flip-cell-active {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  color: var(--nibble-ink);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px var(--amber);
+}
+
+.flip-cell:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Mechanism diagrams (Merkle–Damgård chaining, sponge absorb/squeeze). */
+.mech {
+  margin: 0.4rem 0 0.2rem;
+}
+
+.mech-svg {
+  width: 100%;
+  height: auto;
+  color: var(--muted);
+}
+
+.mech-msg {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+
+.mech-f,
+.mech-perm {
+  fill: var(--panel-strong);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.mech-state,
+.mech-rate {
+  fill: var(--chip);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.mech-cap {
+  fill: var(--amber-soft);
+  stroke: var(--amber);
+  stroke-width: 1;
+}
+
+.mech-digest {
+  fill: rgba(83, 209, 139, 0.16);
+  stroke: var(--green);
+  stroke-width: 1.5;
+}
+
+.mech-flow text,
+.mech-svg text {
+  fill: var(--ink);
+}
+
+.mech-svg .mech-tag,
+.mech-svg .mech-cap-t {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.mech-line {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.mech figcaption {
+  margin-top: 0.4rem;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
