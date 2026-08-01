@@ -511,6 +511,59 @@ function spongeDiagram(): string {
   `;
 }
 
+/**
+ * Wide-pipe Merkle–Damgård mechanism diagram (Kupyna, Grøstl-style): message
+ * blocks are still chained through a compression function, but the chaining
+ * state is twice the digest width and is never output directly — a final
+ * output transformation Ω truncates it. That truncation, not absorb/squeeze,
+ * is why a wide-pipe hash resists length-extension.
+ */
+function widePipeDiagram(): string {
+  return `
+    <figure class="mech" role="group" aria-label="Wide-pipe Merkle–Damgård construction: blocks chained through a double-width state, then truncated by an output transformation">
+      <svg viewBox="0 0 640 150" class="mech-svg" role="img"
+        aria-label="Message blocks M1 and M2 each feed a compression function f together with the previous chaining state, starting from the initialization vector. The chaining state is twice the digest width. After the last block an output transformation truncates the wide state down to the digest, so the full internal state is never exposed.">
+        <defs>
+          <marker id="wp-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g class="mech-flow" font-size="13" text-anchor="middle">
+          <rect class="mech-state" x="6" y="50" width="56" height="50" rx="6"/>
+          <text x="34" y="80">IV</text>
+          <g>
+            <rect class="mech-msg" x="86" y="10" width="70" height="30" rx="6"/><text x="121" y="30">M1</text>
+            <rect class="mech-f" x="86" y="50" width="70" height="50" rx="8"/><text x="121" y="80">f</text>
+            <line class="mech-line" x1="62" y1="75" x2="86" y2="75" marker-end="url(#wp-arrow)"/>
+            <line class="mech-line" x1="121" y1="40" x2="121" y2="50" marker-end="url(#wp-arrow)"/>
+          </g>
+          <g>
+            <rect class="mech-msg" x="216" y="10" width="70" height="30" rx="6"/><text x="251" y="30">M2</text>
+            <rect class="mech-f" x="216" y="50" width="70" height="50" rx="8"/><text x="251" y="80">f</text>
+            <line class="mech-line" x1="156" y1="75" x2="216" y2="75" marker-end="url(#wp-arrow)"/>
+            <text x="186" y="66" class="mech-tag">2n bits</text>
+            <line class="mech-line" x1="251" y1="40" x2="251" y2="50" marker-end="url(#wp-arrow)"/>
+          </g>
+          <!-- wide state carried into the output transformation, never exposed -->
+          <line class="mech-line" x1="286" y1="75" x2="346" y2="75" marker-end="url(#wp-arrow)"/>
+          <text x="316" y="66" class="mech-tag">2n bits</text>
+          <rect class="mech-cap" x="346" y="50" width="110" height="50" rx="8"/>
+          <text x="401" y="72" class="mech-cap-t">output</text>
+          <text x="401" y="90" class="mech-cap-t">transform &#937;</text>
+          <line class="mech-line" x1="456" y1="75" x2="500" y2="75" marker-end="url(#wp-arrow)"/>
+          <rect class="mech-digest" x="502" y="56" width="120" height="38" rx="8"/>
+          <text x="562" y="80">digest = n bits</text>
+        </g>
+      </svg>
+      <figcaption class="small muted">
+        Blocks still chain left-to-right, but the running state is <strong>twice the digest width</strong> and the
+        output transformation <code>&#937;</code> truncates it. Because the full internal state is never handed out,
+        there is nothing for an attacker to keep chaining from — no ${gloss('length-extension')}.
+      </figcaption>
+    </figure>
+  `;
+}
+
 function renderSm3Exhibit(): string {
   const parsed = parseInput(state.sm3.input, state.sm3.mode);
   if (!parsed.ok) {
@@ -551,16 +604,18 @@ function renderSm3Exhibit(): string {
           the same block-chaining family as SHA-256.
         </p>
         <details class="explainer">
-          <summary>Constructions 101 — Merkle–Damgård vs sponge (the distinction this whole demo turns on)</summary>
+          <summary>Constructions 101 — block-chaining vs sponge (the distinction this whole demo turns on)</summary>
           <div class="constr-101">
             <div>
-              <strong>Merkle–Damgård</strong> (SM3, SHA-256, Streebog): chop the message into fixed
-              blocks and chain each one through a <em>compression function</em>, carrying a running
-              state forward. Simple and fast — but the final state <em>is</em> the digest, which
-              exposes it to ${gloss('length-extension')}.
+              <strong>Merkle–Damgård</strong> (SM3, SHA-256, and — in ${gloss('wide-pipe')} form —
+              Streebog and Kupyna): chop the message into fixed blocks and chain each one through a
+              <em>compression function</em>, carrying a running state forward. Simple and fast — and
+              when the final state <em>is</em> handed out as the digest (SM3, SHA-256) that exposes it
+              to ${gloss('length-extension')}. Wide-pipe designs keep an internal state wider than the
+              digest and finalize before output, so there is no full state to extend from.
             </div>
             <div>
-              <strong>Sponge</strong> (Kupyna, SHA-3): ${gloss('sponge', 'absorb')} the message into one
+              <strong>Sponge</strong> (SHA-3): ${gloss('sponge', 'absorb')} the message into one
               big internal state a few bytes at a time, then <em>squeeze</em> the digest out of it.
               The state is wider than the output, so the final chaining value is never revealed —
               which is why sponges are immune to length-extension by construction.
@@ -659,7 +714,7 @@ function renderStreebogExhibit(): string {
       <div class="panel">
         <h3>Mandatory ${gloss('S-box')} connection note</h3>
         <div class="callout warn">
-          Streebog uses the same ${gloss('S-box')} as Kuznyechik. In 2019, Léo Perrin and co-authors documented hidden structure in that S-box inconsistent
+          Streebog uses the same ${gloss('S-box')} as Kuznyechik. In 2019, Léo Perrin documented hidden structure in that S-box inconsistent
           with random generation. The same S-box controversy from Kuznyechik applies here. Use Streebog only when Russian GOST R 34.11-2012 compliance requires it.
         </div>
         <p class="small">
@@ -707,8 +762,11 @@ function renderKupynaExhibit(): string {
         <h2>Exhibit 3 — Kupyna (Ukraine)</h2>
         <p class="muted small">
           <strong>DSTU 7564:2014</strong> defines Kupyna as Ukraine's national hash standard with 256-bit and 512-bit variants.
-          It uses a permutation-driven ${gloss('sponge')}-like ${gloss('wide-pipe')} design instead of
-          ${gloss('Merkle-Damgard', 'Merkle–Damgård')} chaining — the message is absorbed into a wide state, not chained block-by-block.
+          It is a ${gloss('wide-pipe')} ${gloss('Merkle-Damgard', 'Merkle–Damgård')} design in the style of the SHA-3 finalist
+          Grøstl: blocks <em>are</em> chained, but through a compression function built from two permutations
+          (T<sup>⊕</sup> and T<sup>+</sup>, borrowed from the Kalyna block cipher) over a state twice the digest width,
+          with a final output transformation that truncates it. It is not a ${gloss('sponge')} — the resistance to
+          length-extension comes from the wide state and the output transformation, not from absorb-and-squeeze.
         </p>
         <label for="kupyna-mode">Input mode</label>
         <select id="kupyna-mode">
@@ -728,13 +786,15 @@ function renderKupynaExhibit(): string {
         ${hashRow(currentSize === 256 ? 'SHA-3-256' : 'SHA-3-512', sha3Digest, `kupyna-ref-${currentSize}`)}
       </div>
       <div class="panel">
-        <h3>How a sponge works (Kupyna &amp; SHA-3)</h3>
-        <p class="small muted">Instead of chaining blocks, a sponge absorbs the message into one wide state, then squeezes the digest out. The hidden capacity half is never exposed:</p>
-        ${spongeDiagram()}
+        <h3>How Kupyna actually works — wide-pipe chaining, not a sponge</h3>
+        <p class="small muted">Kupyna does chain blocks, like SM3 and SHA-256 — but over a state twice the digest width, and it never hands that state out directly. A final output transformation truncates it:</p>
+        ${widePipeDiagram()}
         <ul class="small">
-          <li>Both Kupyna and SHA-3 are permutation-based ${gloss('sponge')} families.</li>
-          <li>Kupyna uses a dedicated permutation (10 rounds in its base round structure).</li>
+          <li>Kupyna is a ${gloss('wide-pipe')} ${gloss('Merkle-Damgard', 'Merkle–Damgård')} hash, structurally close to the SHA-3 finalist Grøstl — <strong>not</strong> a ${gloss('sponge')}. SHA-3 is the sponge in this comparison; Kupyna is the wide-pipe alternative.</li>
+          <li>Its compression step is <code>h<sub>i</sub> = T<sup>⊕</sup>(h<sub>i−1</sub> ⊕ m<sub>i</sub>) ⊕ T<sup>+</sup>(m<sub>i</sub>) ⊕ h<sub>i−1</sub></code>, built from two permutations taken from the Kalyna block cipher (DSTU 7624:2014).</li>
+          <li>Kupyna-256 uses a 512-bit state with 10 rounds per permutation; Kupyna-512 uses a 1024-bit state with 14 rounds.</li>
           <li>SHA-3 uses ${gloss('Keccak-f[1600]')} with 24 rounds of θ (theta), ρ (rho), π (pi), χ (chi), and ι (iota).</li>
+          <li>Both avoid ${gloss('length-extension')}, but for different reasons: SHA-3 never exposes the sponge capacity, while Kupyna truncates a doubled-width state in its output transformation.</li>
           <li>Kupyna targets efficient hardware and 64-bit software without large lookup tables.</li>
         </ul>
         <div class="callout">
@@ -818,6 +878,8 @@ function renderAnchorsExhibit(): string {
           <li><strong>SHA-256</strong> — FIPS 180-4, ${gloss('Merkle-Damgard', 'Merkle–Damgård')}, 64 rounds, widely deployed in TLS and software signing.</li>
           <li><strong>SHA-3</strong> — FIPS 202, ${gloss('sponge')} construction over ${gloss('Keccak-f[1600]')}, 24 rounds, open competition lineage.</li>
         </ul>
+        <p class="small muted">SHA-3 is the only ${gloss('sponge')} in this lab — every other algorithm here chains blocks:</p>
+        ${spongeDiagram()}
       </div>
     </div>
     <div class="grid-2" style="margin-top: 1rem;">${outputCards}</div>
@@ -854,7 +916,7 @@ function renderDecisionExhibit(): string {
             <tr><th scope="row">Country</th><td>China</td><td>Russia</td><td>Ukraine</td><td>USA (NIST)</td><td>USA (NIST)</td></tr>
             <tr><th scope="row">Year</th><td>2010</td><td>2012</td><td>2014</td><td>2001</td><td>2015</td></tr>
             <tr><th scope="row">Output sizes</th><td>256-bit</td><td>256 / 512-bit</td><td>256 / 512-bit</td><td>256-bit</td><td>224/256/384/512</td></tr>
-            <tr><th scope="row">Construction</th><td>Merkle-Damgard</td><td>Wide-pipe MD</td><td>Sponge-like</td><td>Merkle-Damgard</td><td>Sponge</td></tr>
+            <tr><th scope="row">Construction</th><td>Merkle-Damgard</td><td>Wide-pipe MD</td><td>Wide-pipe MD (Grostl-like)</td><td>Merkle-Damgard</td><td>Sponge</td></tr>
             <tr><th scope="row">ISO standardized</th><td>Yes</td><td>Yes</td><td>No (DSTU)</td><td>Yes</td><td>Yes</td></tr>
             <tr><th scope="row">Design transparency</th><td>Partial</td><td>S-box opaque concern</td><td>Published</td><td>Published</td><td>Published</td></tr>
             <tr><th scope="row">Known practical breaks</th><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td></tr>
@@ -873,8 +935,8 @@ function renderDecisionExhibit(): string {
         <summary>How each trust grade was derived</summary>
         <ul class="small trust-notes">
           <li><sup>a</sup> <strong>SM3 — Medium-High.</strong> No practical break; strong cryptanalytic pedigree (Wang Xiaoyun's team). Marked down only because the full design rationale is less openly documented than the AES/SHA-3 competition processes.</li>
-          <li><sup>b</sup> <strong>Streebog — Use with caution.</strong> Perrin et al. (2019) showed the shared Kuznyechik ${gloss('S-box')} has hidden structure inconsistent with random generation. No break follows from it, but unexplained structure in an opaque component is a design-trust red flag outside a compliance mandate.</li>
-          <li><sup>c</sup> <strong>Kupyna — High.</strong> Public design, sponge-style construction (no length-extension), no known practical weakness. Lower ecosystem/tooling maturity than SHA-2/3 is a practical, not a trust, caveat.</li>
+          <li><sup>b</sup> <strong>Streebog — Use with caution.</strong> Perrin (2019) showed the shared Kuznyechik ${gloss('S-box')} has hidden structure inconsistent with random generation. No break follows from it, but unexplained structure in an opaque component is a design-trust red flag outside a compliance mandate.</li>
+          <li><sup>c</sup> <strong>Kupyna — High.</strong> Public design, wide-pipe construction with an output transformation (no length-extension), no known practical weakness. Lower ecosystem/tooling maturity than SHA-2/3 is a practical, not a trust, caveat.</li>
           <li><sup>d</sup> <strong>SHA-256 / SHA-3 — High.</strong> Decades (SHA-256) or an open public competition (SHA-3) of scrutiny, fully published design, ubiquitous tooling.</li>
         </ul>
         <p class="small muted">Sources: L. Perrin, "Partitions in the S-Box of Streebog and Kuznyechik" (ToSC 2019); FIPS 180-4; FIPS 202; GM/T 0004-2012; DSTU 7564:2014.</p>

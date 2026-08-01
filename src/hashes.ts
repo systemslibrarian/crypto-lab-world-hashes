@@ -92,7 +92,7 @@ export const TEST_VECTORS: TestVector[] = [
   // SHA-256 — FIPS 180-4
   { algorithm: 'sha256', input: '', inputLabel: 'empty string', expected: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', source: 'FIPS 180-4 / NIST CAVP' },
   { algorithm: 'sha256', input: 'abc', inputLabel: '"abc"', expected: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', source: 'FIPS 180-4' },
-  { algorithm: 'sha256', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: 'd7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592', source: 'NIST CAVP' },
+  { algorithm: 'sha256', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: 'd7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592', source: 'widely published reference value (not a FIPS/CAVP vector)' },
   // SHA-512 — FIPS 180-4
   { algorithm: 'sha512', input: '', inputLabel: 'empty string', expected: 'cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e', source: 'FIPS 180-4' },
   { algorithm: 'sha512', input: 'abc', inputLabel: '"abc"', expected: 'ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f', source: 'FIPS 180-4' },
@@ -102,12 +102,12 @@ export const TEST_VECTORS: TestVector[] = [
   { algorithm: 'sha3-512', input: '', inputLabel: 'empty string', expected: 'a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26', source: 'FIPS 202' },
   // Streebog — GOST R 34.11-2012
   { algorithm: 'streebog256', input: '', inputLabel: 'empty string', expected: '3f539a213e97c802cc229d474c6aa32a825a360b2a933a949fd925208d9ce1bb', source: 'GOST R 34.11-2012' },
-  { algorithm: 'streebog256', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: '3e7dea7f2384b6c5a3d0e24aaa29c05e89ddd762145030ec22c71a6db8b2c1f4', source: 'GOST R 34.11-2012 reference' },
+  { algorithm: 'streebog256', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: '3e7dea7f2384b6c5a3d0e24aaa29c05e89ddd762145030ec22c71a6db8b2c1f4', source: 'widely published reference value (not in GOST R 34.11-2012 / RFC 6986)' },
   { algorithm: 'streebog512', input: '', inputLabel: 'empty string', expected: '8e945da209aa869f0455928529bcae4679e9873ab707b55315f56ceb98bef0a7362f715528356ee83cda5f2aac4c6ad2ba3a715c1bcd81cb8e9f90bf4c1c1a8a', source: 'GOST R 34.11-2012' },
-  { algorithm: 'streebog512', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: 'd2b793a0bb6cb5904828b5b6dcfb443bb8f33efc06ad09368878ae4cdc8245b97e60802469bed1e7c21a64ff0b179a6a1e0bb74d92965450a0adab69162c00fe', source: 'GOST R 34.11-2012 reference' },
+  { algorithm: 'streebog512', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: 'd2b793a0bb6cb5904828b5b6dcfb443bb8f33efc06ad09368878ae4cdc8245b97e60802469bed1e7c21a64ff0b179a6a1e0bb74d92965450a0adab69162c00fe', source: 'widely published reference value (not in GOST R 34.11-2012 / RFC 6986)' },
   // Kupyna — DSTU 7564:2014
   { algorithm: 'kupyna256', input: '', inputLabel: 'empty string', expected: 'cd5101d1ccdf0d1d1f4ada56e888cd724ca1a0838a3521e7131d4fb78d0f5eb6', source: 'DSTU 7564:2014' },
-  { algorithm: 'kupyna256', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: '996899f2d7422ceaf552475036b2dc120607eff538abf2b8dff471a98a4740c6', source: 'DSTU 7564:2014 reference' },
+  { algorithm: 'kupyna256', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: '996899f2d7422ceaf552475036b2dc120607eff538abf2b8dff471a98a4740c6', source: 'widely published reference value (not a DSTU 7564:2014 vector)' },
   { algorithm: 'kupyna512', input: '', inputLabel: 'empty string', expected: '656b2f4cd71462388b64a37043ea55dbe445d452aecd46c3298343314ef04019bcfa3f04265a9857f91be91fce197096187ceda78c9c1c021c294a0689198538', source: 'DSTU 7564:2014' }
 ];
 

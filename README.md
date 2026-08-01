@@ -4,7 +4,7 @@
 
 World Hashes demonstrates three national cryptographic hash standards — SM3 (China, OSCCA, 2010), Streebog (Russia, FSB, 2012), and Kupyna (Ukraine, 2014) — alongside SHA-256 and SHA-3 as reference anchors. Each national hash was developed for cryptographic sovereignty: to reduce dependence on U.S.-designed primitives for government and regulated-industry use. The security model is collision-resistant one-way function: given a hash output, finding the input or a second input with the same hash must be computationally infeasible.
 
-The page opens with a **ground-floor "what is a cryptographic hash?" panel** that defines the four properties — deterministic, fixed-length, one-way, collision-resistant — and demonstrates them live (type anything and watch the digest stay 256 bits while a single extra character scrambles it). Every construction term (Merkle–Damgård, sponge, wide-pipe, S-box, Miyaguchi–Preneel, Keccak-f[1600], length-extension) is glossed inline on hover/focus, and a "Constructions 101" note contrasts block-chaining against absorb-and-squeeze so a newcomer can follow the rest.
+The page opens with a **ground-floor "what is a cryptographic hash?" panel** that defines the four properties — deterministic, fixed-length, one-way, collision-resistant — and demonstrates them live (type anything and watch the digest stay 256 bits while a single extra character scrambles it). Every construction term (Merkle–Damgård, sponge, wide-pipe, S-box, Miyaguchi–Preneel, Keccak-f[1600], length-extension) is glossed inline on hover/focus, and a "Constructions 101" note contrasts block-chaining (SM3, SHA-256, and the wide-pipe variants Streebog and Kupyna) against absorb-and-squeeze (SHA-3) so a newcomer can follow the rest.
 
 ## When to Use It
 
@@ -26,15 +26,15 @@ A ground-floor intro panel plus five exhibits:
 0. **What is a cryptographic hash?** — the four properties in plain language, demonstrated live: type anything and watch the SHA-256 digest stay a fixed 256 bits while one extra character scrambles it; a collapsible explains one-wayness and collisions.
 1. **SM3 (China)** with SHA-256 side-by-side, a labelled **Merkle–Damgård mechanism diagram** (message blocks chaining through a compression function to an exposed final state → length-extension), and a **user-driven avalanche** — click any character to flip it yourself and watch the digest re-scramble.
 2. **Streebog (Russia)** with S-box controversy documentation and its wide-pipe MD construction glossed.
-3. **Kupyna (Ukraine)** with geopolitical context and a **sponge mechanism diagram** (absorb into a wide rate/capacity state, squeeze out the digest, capacity never exposed → no length-extension).
-4. **SHA-256 and SHA-3 as reference anchors** with five-way simultaneous hashing.
-5. **Five-way comparison table + decision tree**, with the **Trust-level column explicitly labelled editorial opinion** and each grade sourced in an expandable note (e.g. Streebog's caution cites Perrin et al. 2019 on the shared S-box).
+3. **Kupyna (Ukraine)** with geopolitical context and a **wide-pipe mechanism diagram** (blocks chained through a double-width state, truncated by a final output transformation → no length-extension). Kupyna is a Grøstl-style wide-pipe Merkle–Damgård hash, *not* a sponge.
+4. **SHA-256 and SHA-3 as reference anchors** with five-way simultaneous hashing and the **sponge mechanism diagram** (absorb into a wide rate/capacity state, squeeze out the digest, capacity never exposed → no length-extension) — SHA-3 is the only sponge in the lab.
+5. **Five-way comparison table + decision tree**, with the **Trust-level column explicitly labelled editorial opinion** and each grade sourced in an expandable note (e.g. Streebog's caution cites Perrin, IACR ToSC 2019, on the shared S-box).
 
 All hash outputs are real — no simulation. Every digest is produced in your browser by [`src/hashes.ts`](src/hashes.ts), the same module the test suite checks. Each exhibit shows a **visual avalanche diff** (changed hex nibbles highlighted, with bit-diffusion percentage against the ideal ~50%) and a live **input byte-length** readout. Nothing is sent to a server — all hashing is local.
 
 ## What Can Go Wrong
 
-- Using a raw Merkle–Damgård hash (SM3, SHA-256, Streebog) directly as a MAC is vulnerable to length-extension; wrap it in HMAC instead.
+- Using a narrow-pipe Merkle–Damgård hash (SM3, SHA-256) directly as a MAC is vulnerable to length-extension; wrap it in HMAC instead. Streebog and Kupyna avoid this — Streebog through its length/checksum finalization, Kupyna through its wide state and output transformation — but HMAC remains the portable choice.
 - Streebog and Kuznyechik share S-box transparency concerns, so deploying Streebog outside its compliance mandate inherits an unresolved design-trust question.
 - Reaching for a national hash outside its regulatory requirement trades SHA-2/SHA-3 scrutiny and tooling for weaker ecosystem support with no security gain.
 - Collision and second-preimage resistance are assumptions, not guarantees; truncating a digest or misusing it for password storage (no salt/KDF) undermines the intended security.
@@ -65,7 +65,7 @@ npm run dev
 
 ## Verified Correctness
 
-The hero shows a live self-test badge (e.g. `✓ 17/17 test vectors verified`). On every page load the app recomputes published **known-answer test vectors** and compares them byte-for-byte against the values in each algorithm's defining standard:
+The hero shows a live self-test badge (e.g. `✓ 17/17 test vectors verified`). On every page load the app recomputes published **known-answer test vectors** and compares them byte-for-byte against published values. Where a vector appears in the algorithm's defining standard the table says so; the `"…lazy dog"` vectors are widely published reference values rather than standard vectors, and each entry carries its own provenance label in [`src/hashes.ts`](src/hashes.ts):
 
 | Algorithm | Standard | Vectors |
 | --- | --- | --- |
