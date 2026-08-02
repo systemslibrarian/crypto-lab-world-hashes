@@ -49,3 +49,18 @@ describe('known-answer verification panel', () => {
     expect(document.querySelectorAll('.kat-table .kat-fail')).toHaveLength(0);
   });
 });
+
+describe('Kupyna construction accuracy', () => {
+  it('identifies Kupyna as wide-pipe Merkle–Damgård rather than a sponge', () => {
+    const kupynaTab = document.querySelector<HTMLButtonElement>('[data-tab-target="kupyna"]');
+    kupynaTab?.click();
+
+    const panel = document.getElementById('panel-kupyna');
+    expect(panel?.textContent).toContain('wide-pipe');
+    expect(panel?.textContent).toContain('Merkle–Damgård');
+    expect(panel?.textContent).toContain('not a sponge');
+    expect(
+      panel?.querySelector('[aria-label^="Wide-pipe Merkle–Damgård construction"]'),
+    ).not.toBeNull();
+  });
+});
