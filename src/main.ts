@@ -1,9 +1,24 @@
 import './styles.css';
 
 import { ALGORITHM_LABELS, computeHex, runSelfTest } from './hashes';
-import type { SelfTestReport } from './hashes';
+import type { AlgorithmId, SelfTestReport } from './hashes';
+import {
+  EXTENDABLE_ALGORITHMS,
+  attemptLengthExtension,
+  checkResistance,
+  crossCheckImplementations,
+} from './length-extension';
+import type { ExtendableAlgorithm, ExtensionAttempt, ResistanceResult } from './length-extension';
+import {
+  MAX_TRUNCATION_BITS,
+  MIN_TRUNCATION_BITS,
+  collisionVerdict,
+  expectedHashes,
+  findTruncatedCollision,
+} from './collision-search';
+import type { CollisionResult } from './collision-search';
 
-type TabId = 'sm3' | 'streebog' | 'kupyna' | 'anchors' | 'decision';
+type TabId = 'sm3' | 'streebog' | 'kupyna' | 'anchors' | 'break' | 'decision';
 type InputMode = 'text' | 'hex';
 type DigestSize = 256 | 512;
 
@@ -19,6 +34,18 @@ const state: {
   streebog: { input: string; mode: InputMode; size: DigestSize };
   kupyna: { input: string; mode: InputMode; size: DigestSize };
   anchors: { input: string; mode: InputMode };
+  break: {
+    algorithm: ExtendableAlgorithm;
+    secret: string;
+    message: string;
+    suffix: string;
+    guessedSecretLength: number;
+    attempt: ExtensionAttempt | null;
+    resistance: ResistanceResult[] | null;
+    collisionAlgorithm: AlgorithmId;
+    collisionBits: number;
+    collision: CollisionResult | null;
+  };
   copyState: CopyState;
 } = {
   activeTab: 'sm3',
@@ -46,6 +73,18 @@ const state: {
     input: 'One message, five standards, five distinct digests.',
     mode: 'text'
   },
+  break: {
+    algorithm: 'sha256',
+    secret: 'sup3rs3cr3t',
+    message: 'user=guest&role=viewer',
+    suffix: '&role=admin',
+    guessedSecretLength: 11,
+    attempt: null,
+    resistance: null,
+    collisionAlgorithm: 'sha256',
+    collisionBits: 24,
+    collision: null
+  },
   copyState: {
     key: '',
     status: 'idle'
@@ -68,6 +107,14 @@ function saveTheme(theme: string): void {
 // code the UI uses. The result is surfaced as a trust badge in the hero so a
 // visitor can see the live build matches the published standards.
 const selfTest: SelfTestReport = runSelfTest();
+
+// The attack lab reimplements the SHA-256 and SM3 compression functions,
+// because no library exposes a resumable state. This cross-check runs on every
+// page load: if those reimplementations ever disagreed with the audited
+// libraries the rest of the lab uses, the exhibit must refuse to claim a
+// forgery rather than show one it cannot justify.
+const crossChecks = crossCheckImplementations();
+const crossChecksAgree = crossChecks.every((check) => check.agrees);
 
 function escapeHtml(input: string): string {
   return input
@@ -817,6 +864,242 @@ function renderKupynaExhibit(): string {
   `;
 }
 
+/* ==========================================================================
+   Exhibit 5 — Break it.
+   Two labs that RUN attacks rather than describing them: a real Merkle–Damgård
+   length-extension forgery against SM3 and SHA-256, and a real birthday
+   collision search on truncated digests. Every verdict on this tab is computed
+   from the attempt the learner just made.
+   ========================================================================== */
+
+const RESISTANT_LINEUP = ['sha3-256', 'kupyna256', 'streebog256', 'hmac-sha256'] as const;
+
+function renderExtensionResult(attempt: ExtensionAttempt): string {
+  const forged = attempt.forged;
+  const cls = forged ? 'callout warn attack-verdict' : 'callout good attack-verdict';
+  const headline = forged
+    ? `FORGED — the tag was extended without the secret`
+    : `NOT FORGED — the guessed secret length was wrong`;
+  const detail = forged
+    ? `The attack loaded the published tag back into ${ALGORITHM_LABELS[attempt.algorithm]}'s
+       compression function, appended ${attempt.suffix.length} suffix
+       ${attempt.suffix.length === 1 ? 'byte' : 'bytes'}, and produced a tag that matches what the
+       server computes for the extended message — byte for byte. The secret was never used to build it.`
+    : `You guessed the secret was ${attempt.guessedSecretLength}
+       ${attempt.guessedSecretLength === 1 ? 'byte' : 'bytes'}; it is actually
+       ${attempt.actualSecretLength}. The glue padding was therefore built for the wrong length, so the
+       resumed state was fed the wrong bytes and the forged tag does not match. The attack needs the
+       length — but only the length, and an attacker can simply try every plausible one.`;
+
+  return `
+    <div class="${cls}" data-attack-result="${forged ? 'forged' : 'not-forged'}">
+      <strong>${headline}</strong>
+      <p class="small" style="margin:.4rem 0 0;">${detail}</p>
+    </div>
+    <div class="attack-rows">
+      <div class="attack-row">
+        <span class="attack-key">Published tag</span>
+        <code class="attack-val" id="attack-known-tag">${attempt.tag}</code>
+      </div>
+      <div class="attack-row">
+        <span class="attack-key">Glue padding the attacker rebuilt</span>
+        <code class="attack-val">${attempt.gluePaddingHex.slice(0, 96)}${attempt.gluePaddingHex.length > 96 ? '…' : ''}</code>
+      </div>
+      <div class="attack-row">
+        <span class="attack-key">Forged message (what the server would see)</span>
+        <code class="attack-val">${escapeHtml(attempt.forgedMessagePreview)}</code>
+      </div>
+      <div class="attack-row">
+        <span class="attack-key">Forged tag (attacker, no secret)</span>
+        <code class="attack-val" id="attack-forged-tag">${attempt.forgedTag}</code>
+      </div>
+      <div class="attack-row">
+        <span class="attack-key">Server's real tag for that message</span>
+        <code class="attack-val" id="attack-server-tag">${diffDigestHtml(attempt.forgedTag, attempt.serverTag)}</code>
+      </div>
+    </div>`;
+}
+
+function renderResistanceRows(results: ResistanceResult[]): string {
+  return results
+    .map(
+      (r) => `
+      <tr data-resist-row="${r.algorithm}">
+        <td><strong>${escapeHtml(r.label)}</strong></td>
+        <td class="small">${escapeHtml(r.reason)}</td>
+        <td data-resist-outcome="${r.forged ? 'forged' : 'held'}">
+          ${r.forged
+            ? '<span class="kat-fail">✕ FORGED — this must not happen</span>'
+            : '<span class="kat-pass">✓ held — tags differ</span>'}
+        </td>
+      </tr>`,
+    )
+    .join('');
+}
+
+function renderCollisionResult(result: CollisionResult): string {
+  const verdict = collisionVerdict(result);
+  const cls =
+    verdict.kind === 'collision' ? 'callout warn attack-verdict' : 'callout attack-verdict';
+  const body =
+    verdict.kind === 'collision'
+      ? `
+      <div class="attack-rows">
+        <div class="attack-row"><span class="attack-key">Input A</span><code class="attack-val">${escapeHtml(result.inputA ?? '')}</code></div>
+        <div class="attack-row"><span class="attack-key">Input B</span><code class="attack-val">${escapeHtml(result.inputB ?? '')}</code></div>
+        <div class="attack-row"><span class="attack-key">Shared first ${result.bits} bits</span><code class="attack-val">${result.truncatedHex ?? ''}…</code></div>
+        <div class="attack-row"><span class="attack-key">Full digest A</span><code class="attack-val" id="collision-digest-a">${result.digestA ?? ''}</code></div>
+        <div class="attack-row"><span class="attack-key">Full digest B</span><code class="attack-val" id="collision-digest-b">${diffDigestHtml(result.digestA ?? '', result.digestB ?? '')}</code></div>
+      </div>
+      <p class="small muted" style="margin:.5rem 0 0;">
+        The two full digests above are <strong>different</strong> — highlighted where they diverge.
+        Only the truncated prefix collides. That is the whole point: truncation is what made this
+        findable, and the untruncated function is untouched.
+      </p>`
+      : '';
+
+  return `
+    <div class="${cls}" data-collision-verdict="${verdict.kind}">
+      <strong>${escapeHtml(verdict.headline)}</strong>
+      <p class="small" style="margin:.4rem 0 0;">${escapeHtml(verdict.detail)}</p>
+    </div>
+    <p class="small muted" style="margin:.5rem 0 0;">
+      Measured: <strong id="collision-hashes">${result.hashes.toLocaleString()}</strong> hashes in
+      ${result.elapsedMs} ms · birthday expectation
+      <strong>${Math.round(result.expected).toLocaleString()}</strong> · budget
+      ${result.budget.toLocaleString()}.
+    </p>
+    ${body}`;
+}
+
+function renderBreakItExhibit(): string {
+  const b = state.break;
+  const algoOptions = EXTENDABLE_ALGORITHMS.map(
+    (id) => `<option value="${id}" ${b.algorithm === id ? 'selected' : ''}>${ALGORITHM_LABELS[id]}</option>`,
+  ).join('');
+  const collisionOptions = (Object.keys(ALGORITHM_LABELS) as AlgorithmId[])
+    .map((id) => `<option value="${id}" ${b.collisionAlgorithm === id ? 'selected' : ''}>${ALGORITHM_LABELS[id]}</option>`)
+    .join('');
+
+  const crossCheckNote = crossChecksAgree
+    ? `<span class="kat-pass">✓ ${crossChecks.length}/${crossChecks.length} agree</span>`
+    : `<span class="kat-fail">✕ ${crossChecks.filter((c) => !c.agrees).length} disagree — no forgery is claimed</span>`;
+
+  return `
+    <div class="panel">
+      <h2>Exhibit 5 — Break it: length extension, for real</h2>
+      <p class="small muted" style="max-width:74ch;">
+        Every other exhibit tells you that ${gloss('Merkle-Damgard', 'Merkle–Damgård')} hashes hand out
+        their final chaining state as the digest, and that this exposes
+        ${gloss('length-extension')}. Here you do it. A server authenticates messages with the naive
+        construction <code>tag = H(secret ‖ message)</code> and publishes the message and the tag —
+        never the secret. Given only those, plus a guess at the secret's <em>length</em>, the attack
+        below appends whatever you like and produces a tag the server accepts.
+      </p>
+      <p class="small muted" style="max-width:74ch;">
+        <strong>How this is kept honest.</strong> The attack needs a hash it can resume from an
+        arbitrary state, which no library exposes, so <code>src/length-extension.ts</code>
+        reimplements the SHA-256 and SM3 compression functions from FIPS 180-4 and GM/T 0004-2012.
+        Those reimplementations are cross-checked against the audited libraries the rest of this lab
+        uses on every page load: ${crossCheckNote}. The forging routine is handed only the tag, the
+        guessed length and the suffix — it is never passed the secret, so "no secret required" is a
+        fact about its signature, not a claim in prose.
+      </p>
+
+      <div class="grid-2 attack-controls">
+        <div>
+          <label for="break-algorithm">Algorithm (must be narrow-pipe Merkle–Damgård)</label>
+          <select id="break-algorithm">${algoOptions}</select>
+          <label for="break-secret">Server's secret (the attacker never sees this)</label>
+          <input id="break-secret" type="text" value="${escapeHtml(b.secret)}" />
+          <label for="break-message">Published message</label>
+          <input id="break-message" type="text" value="${escapeHtml(b.message)}" />
+        </div>
+        <div>
+          <label for="break-suffix">Suffix to append (your forgery)</label>
+          <input id="break-suffix" type="text" value="${escapeHtml(b.suffix)}" />
+          <label for="break-length">Guessed secret length, in bytes</label>
+          <input id="break-length" type="number" min="0" max="4096" step="1" value="${b.guessedSecretLength}" />
+          <p class="small muted" style="margin:.35rem 0 0;">
+            The real secret is ${encoder.encode(b.secret).length} bytes. Set this wrong and the
+            forgery fails — the attack needs the length, though an attacker can simply try each one.
+          </p>
+        </div>
+      </div>
+      <div class="attack-buttons">
+        <button type="button" class="attack-button" id="break-run">Run the attack</button>
+        <button type="button" class="attack-button secondary" id="break-run-wrong">Run it with the wrong length</button>
+      </div>
+      <div id="break-output" role="status" aria-live="polite">
+        ${b.attempt
+          ? renderExtensionResult(b.attempt)
+          : '<p class="small muted">Nothing has been run yet, so no forgery is claimed.</p>'}
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:1rem;">
+      <h3>The same attack against the constructions that resist it</h3>
+      <p class="small muted" style="max-width:74ch;">
+        For a ${gloss('sponge')}, a ${gloss('wide-pipe')} hash, or a hash whose finalization folds in
+        the message length and a checksum, the attack above <em>cannot be assembled at all</em> —
+        there is no chaining state to load. What the page can compute, and does, is the closest
+        analogue available to an attacker with no internal state: continue from the published tag and
+        compare against what the server produces. It must never match.
+      </p>
+      <div class="compare-table-wrap">
+        <table class="comparison-table">
+          <thead><tr><th scope="col">Construction</th><th scope="col">Why the attack has no entry point</th><th scope="col">Measured result</th></tr></thead>
+          <tbody id="break-resist-body">
+            ${b.resistance
+              ? renderResistanceRows(b.resistance)
+              : '<tr><td colspan="3" class="small muted">Press the button below to run it.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      <div class="attack-buttons">
+        <button type="button" class="attack-button" id="break-run-resistant">Try the attack on SHA-3, Kupyna, Streebog and HMAC</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:1rem;">
+      <h3>Collision resistance, at a width you can actually attack</h3>
+      <p class="small muted" style="max-width:74ch;">
+        Nobody can show you a full SHA-256 collision. But truncate a digest to a few dozen bits and
+        the birthday bound becomes something you can watch happen: the work scales as
+        <strong>2<sup>n/2</sup></strong>, not 2<sup>n</sup>. The search below hashes real distinct
+        inputs with the same implementations as every other panel, stops at the first genuine
+        collision, and rechecks it — the two inputs must differ, their truncated prefixes must match,
+        and their full digests must not.
+      </p>
+      <div class="grid-2 attack-controls">
+        <div>
+          <label for="collision-algorithm">Algorithm</label>
+          <select id="collision-algorithm">${collisionOptions}</select>
+        </div>
+        <div>
+          <label for="collision-bits">Truncate to (bits)</label>
+          <input id="collision-bits" type="number" min="${MIN_TRUNCATION_BITS}" max="${MAX_TRUNCATION_BITS}" step="1" value="${b.collisionBits}" />
+          <p class="small muted" style="margin:.35rem 0 0;">
+            Expected work at this width: about
+            <strong>${Math.round(expectedHashes(b.collisionBits)).toLocaleString()}</strong> hashes
+            (√(π/2·2<sup>${b.collisionBits}</sup>)). Above ${MAX_TRUNCATION_BITS} bits the search would
+            hang the page, so the control stops there rather than offering a search it cannot finish.
+          </p>
+        </div>
+      </div>
+      <div class="attack-buttons">
+        <button type="button" class="attack-button" id="collision-run">Search for a collision</button>
+        <button type="button" class="attack-button secondary" id="collision-run-starved">Search with a 50-hash budget</button>
+      </div>
+      <div id="collision-output" role="status" aria-live="polite">
+        ${b.collision
+          ? renderCollisionResult(b.collision)
+          : '<p class="small muted">No search has been run yet, so no collision is claimed.</p>'}
+      </div>
+    </div>
+  `;
+}
+
 function renderAnchorsExhibit(): string {
   const parsed = parseInput(state.anchors.input, state.anchors.mode);
   if (!parsed.ok) {
@@ -990,7 +1273,8 @@ function render(): void {
     { id: 'streebog', label: '2. Streebog' },
     { id: 'kupyna', label: '3. Kupyna' },
     { id: 'anchors', label: '4. Anchors' },
-    { id: 'decision', label: '5. Comparison' }
+    { id: 'break', label: '5. Break it' },
+    { id: 'decision', label: '6. Comparison' }
   ];
 
   const tabButtons = tabs.map((t) => {
@@ -1008,6 +1292,7 @@ function render(): void {
     sm3: renderSm3Exhibit(),
     streebog: renderStreebogExhibit(),
     kupyna: renderKupynaExhibit(),
+    break: renderBreakItExhibit(),
     anchors: renderAnchorsExhibit(),
     decision: renderDecisionExhibit()
   };
@@ -1117,6 +1402,37 @@ function wireEvents(): void {
       return;
     }
 
+    if (target instanceof HTMLButtonElement && target.id.startsWith('break-run')) {
+      const b = state.break;
+      // "Wrong length" deliberately guesses one byte short, so the learner can
+      // watch the forgery fail for a reason the page then names.
+      const guess =
+        target.id === 'break-run-wrong'
+          ? Math.max(0, encoder.encode(b.secret).length - 1)
+          : b.guessedSecretLength;
+      if (target.id === 'break-run-resistant') {
+        b.resistance = RESISTANT_LINEUP.map((algorithm) =>
+          checkResistance(algorithm, b.secret, b.message, b.suffix),
+        );
+      } else {
+        b.guessedSecretLength = guess;
+        b.attempt = attemptLengthExtension(b.algorithm, b.secret, b.message, b.suffix, guess);
+      }
+      render();
+      return;
+    }
+
+    if (target instanceof HTMLButtonElement && target.id.startsWith('collision-run')) {
+      const budget = target.id === 'collision-run-starved' ? 50 : 400_000;
+      state.break.collision = findTruncatedCollision(
+        state.break.collisionAlgorithm,
+        state.break.collisionBits,
+        budget,
+      );
+      render();
+      return;
+    }
+
     const copy = target.closest<HTMLButtonElement>('[data-copy-key]');
     if (copy) {
       const key = copy.dataset.copyKey ?? '';
@@ -1137,7 +1453,26 @@ function wireEvents(): void {
     'kupyna-mode': (v) => { state.kupyna.mode = v as InputMode; },
     'kupyna-size': (v) => { state.kupyna.size = Number.parseInt(v, 10) as DigestSize; },
     'anchors-input': (v) => { state.anchors.input = v; },
-    'anchors-mode': (v) => { state.anchors.mode = v as InputMode; }
+    'anchors-mode': (v) => { state.anchors.mode = v as InputMode; },
+    // Changing any attack input invalidates the previous result: a verdict must
+    // never outlive the inputs that produced it.
+    'break-algorithm': (v) => { state.break.algorithm = v as ExtendableAlgorithm; state.break.attempt = null; },
+    'break-secret': (v) => { state.break.secret = v; state.break.attempt = null; state.break.resistance = null; },
+    'break-message': (v) => { state.break.message = v; state.break.attempt = null; state.break.resistance = null; },
+    'break-suffix': (v) => { state.break.suffix = v; state.break.attempt = null; state.break.resistance = null; },
+    'break-length': (v) => {
+      const parsed = Number.parseInt(v, 10);
+      state.break.guessedSecretLength = Number.isFinite(parsed) ? Math.min(4096, Math.max(0, parsed)) : 0;
+      state.break.attempt = null;
+    },
+    'collision-algorithm': (v) => { state.break.collisionAlgorithm = v as AlgorithmId; state.break.collision = null; },
+    'collision-bits': (v) => {
+      const parsed = Number.parseInt(v, 10);
+      state.break.collisionBits = Number.isFinite(parsed)
+        ? Math.min(MAX_TRUNCATION_BITS, Math.max(MIN_TRUNCATION_BITS, parsed))
+        : MIN_TRUNCATION_BITS;
+      state.break.collision = null;
+    }
   };
 
   document.addEventListener('input', (event) => {

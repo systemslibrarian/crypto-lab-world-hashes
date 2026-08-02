@@ -2,7 +2,7 @@
   "name": "crypto-lab-world-hashes",
   "version": "0.1.0",
   "private": true,
-  "description": "World Hashes demo: SM3, Streebog, Kupyna, SHA-256, and SHA-3.",
+  "description": "World Hashes demo: SM3, Streebog, Kupyna, SHA-256, and SHA-3 — with an attack lab that runs a real Merkle-Damgard length-extension forgery against SM3 and SHA-256, shows the sponge and wide-pipe constructions holding against the same attempt, and searches for real truncated-digest collisions.",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

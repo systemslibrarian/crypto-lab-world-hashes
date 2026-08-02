@@ -9,7 +9,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
-const TAB_IDS = ['sm3', 'streebog', 'kupyna', 'anchors', 'decision'];
+const TAB_IDS = ['sm3', 'streebog', 'kupyna', 'anchors', 'break', 'decision'];
 
 // Neutralize animations/transitions/opacity so nothing is mid-flight while axe
 // samples colours, and reveal any collapsed regions.
@@ -43,6 +43,20 @@ async function driveAllTabs(page: Page): Promise<void> {
       await input.fill('accessibility scan probe');
     }
   }
+
+  // The attack lab only renders its result regions after something is run, and
+  // both the success and failure palettes have to be scanned.
+  await page.locator('#tab-break').click();
+  await page.locator('#break-run').click();
+  await expect(page.locator('[data-attack-result="forged"]')).toBeVisible({ timeout: 30_000 });
+  await page.locator('#break-run-resistant').click();
+  await expect(page.locator('[data-resist-row="kupyna256"]')).toBeVisible({ timeout: 30_000 });
+  await page.locator('#collision-run').click();
+  await expect(page.locator('[data-collision-verdict="collision"]')).toBeVisible({ timeout: 60_000 });
+  await page.locator('#break-run-wrong').click();
+  await expect(page.locator('[data-attack-result="not-forged"]')).toBeVisible({ timeout: 30_000 });
+  await page.locator('#collision-run-starved').click();
+  await expect(page.locator('[data-collision-verdict="exhausted"]')).toBeVisible({ timeout: 30_000 });
 }
 
 async function scan(page: Page): Promise<void> {

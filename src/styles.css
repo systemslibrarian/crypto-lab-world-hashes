@@ -766,3 +766,89 @@ textarea {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ============ Exhibit 5 — the attack labs ============ */
+.attack-controls {
+  gap: 1rem;
+  margin-top: 0.9rem;
+}
+
+.attack-controls input[type='text'],
+.attack-controls input[type='number'],
+.attack-controls select {
+  width: 100%;
+}
+
+.attack-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.9rem 0;
+}
+
+.attack-button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  /* Dark theme's accent is a light blue and light theme's is a dark blue, so
+     the ink has to flip with it to stay above 4.5:1 either way. */
+  color: #08131d;
+  border-radius: 8px;
+  padding: 0.5rem 0.95rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 2.4rem;
+}
+
+[data-theme='light'] .attack-button {
+  color: #ffffff;
+}
+
+.attack-button.secondary,
+[data-theme='light'] .attack-button.secondary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--control-border);
+}
+
+.attack-button:hover {
+  filter: brightness(1.08);
+}
+
+.attack-verdict {
+  margin-top: 0.4rem;
+}
+
+.attack-rows {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.attack-row {
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  gap: 0.3rem 0.9rem;
+  align-items: baseline;
+}
+
+.attack-key {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.attack-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .attack-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
