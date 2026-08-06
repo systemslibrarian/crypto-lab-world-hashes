@@ -30,7 +30,7 @@
     "@li0ard/kupyna": "^0.1.3",
     "@li0ard/streebog": "^0.2.5",
     "@noble/hashes": "^2.2.0",
-    "sm-crypto": "^0.4.0"
+    "sm-crypto": "^0.5.4"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
