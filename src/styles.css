@@ -13,6 +13,11 @@
   --amber: #ffb84d;
   --amber-soft: rgba(255, 184, 77, 0.2);
   --green: #53d18b;
+  /* --green is a GRAPHIC colour (3:1 bar). As text it needs 4.5:1, and only one
+     rule uses it that way — .kat-table .kat-pass. In dark the two coincide;
+     in light they do not, so the ink variant is split out rather than
+     compromising the graphic. Measured: 8.90:1 on the .panel gradient. */
+  --green-ink: #53d18b;
   --red: #ff6b81;
   --muted: #b4c8db;
   --shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
@@ -39,8 +44,19 @@
   --amber: #d97706;
   --amber-soft: rgba(217, 119, 6, 0.15);
   --green: #059669;
+  /* #059669 as ink is 3.77:1 on the white panel and 3.46:1 on the page — under
+     4.5:1 either way. #047857 is 5.49:1 and 5.04:1. The graphic --green is left
+     alone: it clears the 3:1 that a fill, a stroke and a border are held to. */
+  --green-ink: #047857;
   --red: #dc2626;
-  --muted: #666666;
+  /* #666666 was chosen against the flat --bg (#f5f5f5), where it is 5.27:1.
+     It is not on --bg. <body> paints two radial-gradient washes over it, and
+     where they OVERLAP — which at 380px is directly under .cl-hero-desc — the
+     surface composites to rgb(216,212,205) and #666666 measures 4.08:1 there
+     (4.42:1 at 1280px). A token is only safe against the surfaces it was
+     measured on. #575757 is 4.99:1 on that overlap, 6.55:1 on --bg and 7.15:1
+     on the white panel. */
+  --muted: #575757;
   --shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   --focus-ring: 0 0 0 2px var(--accent);
   --ink: #1a1a1a;
@@ -176,7 +192,17 @@ textarea:focus-visible {
 }
 
 .tab-button {
-  border: 1px solid var(--border);
+  /* --control-border, not --border. Every BUTTON on this page is filled with
+     --panel, which is within 1.09:1 of the page behind it in both themes, so the
+     edge is the control's only boundary (SC 1.4.11) and --border is a SURFACE
+     divider — right for .panel, .digest-block and table rules, and no boundary
+     at all here. Measured against what surrounds the button:
+       --border         1.52:1 dark, 1.42:1 light
+       --control-border 4.35:1 dark, 4.12:1 light
+     The 1.4.11 spec this repo shipped could not see it: it queried only
+     `textarea, input[type='text'], select`, which is exactly the set
+     --control-border was already applied to. */
+  border: 1px solid var(--control-border);
   border-radius: 0.75rem;
   background: var(--panel);
   color: var(--ink);
@@ -256,7 +282,10 @@ textarea {
 
 .button-row button,
 .copy-btn {
-  border: 1px solid var(--border);
+  /* See .tab-button. Same fill, same problem: 1.36:1 dark and 1.54:1 light
+     against the .panel gradient these sit on, 3.91:1 and 4.49:1 with
+     --control-border. */
+  border: 1px solid var(--control-border);
   border-radius: 0.65rem;
   background: var(--panel);
   color: var(--ink);
@@ -307,6 +336,17 @@ textarea {
 
 .compare-table-wrap {
   overflow-x: auto;
+}
+
+/* WCAG 2.4.7. All four of these wrappers carry tabindex="0" so their oversized
+   tables can be scrolled from the keyboard (2.1.1) — and anything given
+   tabindex="0" needs a visible focus indicator. Without this they fall back to
+   the UA's ring, which is real but is not this page's idiom and which the
+   `outline: none` two rules above would not have removed only by luck. */
+.compare-table-wrap:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 0.5rem;
 }
 
 .comparison-table {
@@ -386,15 +426,28 @@ textarea {
   transition: width 0.25s ease;
 }
 
-/* Marker at the ideal 50% diffusion point. */
+/* Marker at the ideal 50% diffusion point.
+   Two-tone, and NOT faded with opacity. This 2px rule has to stay visible over
+   two very different surfaces — the unfilled --hash-block track and the
+   accent->green fill — and no single colour clears 3:1 against both in either
+   theme: in dark the fill is a light blue where white is 1.74:1, and in light
+   the track is near-white where #0d0d0d's own theme value is fine but the fill
+   is a dark blue where it is 2.25:1. `opacity: 0.55` made it worse in every
+   direction at once, measuring 1.35:1 over the dark fill and 2.25-2.69:1 over
+   the light one. A --bg core with an --ink-strong halo means whichever surface
+   the marker crosses, one of its two tones clears 3:1 against it — measured:
+   core on the fill 10.97:1 dark / 5.10:1 light, halo on the track 18.19:1 dark /
+   17.84:1 light. The box-shadow stays inside the meter's `overflow: hidden`
+   because it spreads horizontally, which is also why the old -2px overhang was
+   never actually painted. */
 .avalanche-ideal {
   position: absolute;
-  top: -2px;
-  bottom: -2px;
+  top: 0;
+  bottom: 0;
   left: 50%;
   width: 2px;
-  background: var(--ink-strong);
-  opacity: 0.55;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--ink-strong);
 }
 
 .live-note {
@@ -447,8 +500,13 @@ textarea {
   font-weight: 600;
 }
 
+/* --green-ink, not --green. --green is chosen as a GRAPHIC colour — the live
+   dot, the avalanche fill, the digest box's stroke, the verified badge's border
+   — where 3:1 is the bar and the light theme's #059669 clears it. As TEXT it
+   needs 4.5:1, and #059669 measures 3.77:1 on the white panel and 3.46:1 on the
+   page. This is the only place --green is used as ink. */
 .kat-table .kat-pass {
-  color: var(--green);
+  color: var(--green-ink);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -610,7 +668,10 @@ textarea {
   min-width: 1.7rem;
   min-height: 2rem;
   padding: 0.25rem 0.35rem;
-  border: 1px solid var(--border);
+  /* See .tab-button. These are 61 real buttons — one per input character — and
+     with --border each dissolved into the panel behind it, so the strip read as
+     a run of text rather than as something clickable. */
+  border: 1px solid var(--control-border);
   border-radius: 0.4rem;
   background: var(--panel);
   color: var(--ink);

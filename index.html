@@ -184,8 +184,21 @@
         in your browser. All hashing runs locally — no input ever leaves the page.
       </p>
     </noscript>
-    <div id="app" aria-label="World Hashes demo"></div>
-    <footer style="text-align:center; padding: 1.5rem; font-size: 0.85rem; opacity: 0.7; margin-top: 2rem;">
+    <!-- No aria-label here. This is a role-less <div>, and `aria-label` on a
+         role-less element is PROHIBITED by ARIA and silently discarded — axe
+         files it under `incomplete` (aria-prohibited-attr), never under
+         `violations`, so a violations-only gate reports green for a label that
+         does not exist. It carried aria-label="World Hashes demo" until this
+         gate's `incomplete` oracle found it. The structure it was reaching for
+         is already present: src/main.ts renders <main id="main-content"> as this
+         div's only child, and the <h1> inside names the page. -->
+    <div id="app"></div>
+    <!-- De-emphasised with --muted, not with opacity. `opacity: 0.7` faded the
+         related-demo LINKS along with the prose, and --accent at 70% over the
+         light theme's #f5f5f5 page measured 3.04:1 — a 1.4.3 failure. Colour
+         de-emphasis leaves the links at full strength (5.10:1 light, 10.97:1
+         dark) while the surrounding text still recedes (5.27:1 / 11.14:1). -->
+    <footer style="text-align:center; padding: 1.5rem; font-size: 0.85rem; color: var(--muted); margin-top: 2rem;">
       <p class="footer-related">
         Related demos:
         <a href="https://systemslibrarian.github.io/crypto-lab-world-ciphers/">crypto-lab-world-ciphers</a> ·

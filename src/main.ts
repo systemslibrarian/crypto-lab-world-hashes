@@ -335,7 +335,14 @@ function verificationPanel(): string {
         ${selfTest.total} published test vectors and compares them byte-for-byte against the values in each
         algorithm's defining standard — <strong>${selfTest.passed}/${selfTest.total} passing</strong>.
       </p>
-      <div class="compare-table-wrap">
+      <!-- role + tabindex, not just overflow-x. Below 860px .comparison-table
+           takes min-width:700px, so this wrapper scrolls and holds nothing
+           focusable - a WCAG 2.1.1 failure that only exists at phone width, and
+           the one axe reports as scrollable-region-focusable. role="region" is
+           what makes the aria-label legal: on a role-less div it would be
+           prohibited and silently discarded. Note this comment is inside a
+           template literal, so it must contain no backtick. -->
+      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Known-answer verification results, scrollable">
         <table class="comparison-table kat-table">
           <thead><tr><th scope="col">Algorithm</th><th scope="col">Input</th><th scope="col">Source</th><th scope="col">Self-test</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -611,10 +618,49 @@ function widePipeDiagram(): string {
   `;
 }
 
+/**
+ * The mode selector and input box for one exhibit.
+ *
+ * Factored out because the parse-error branch has to render them too, and used
+ * not to. An unparseable input replaced the ENTIRE exhibit panel with a single
+ * warning callout — taking the mode selector and the textarea with it. So a
+ * reader who switched an exhibit to Hex mode while ordinary prose was still in
+ * the box was told the input was invalid and then left with no control to fix
+ * it and no control to switch back; reloading the page was the only way out.
+ * That is a dead end rather than an error message. WCAG 3.3.3 asks that a
+ * detected input error come with a suggestion for correcting it, and a
+ * suggestion the reader cannot act on is not one.
+ */
+function exhibitControls(prefix: string, mode: InputMode, input: string): string {
+  return `
+        <label for="${prefix}-mode">Input mode</label>
+        <select id="${prefix}-mode">
+          <option value="text" ${mode === 'text' ? 'selected' : ''}>Text</option>
+          <option value="hex" ${mode === 'hex' ? 'selected' : ''}>Hex</option>
+        </select>
+        <label for="${prefix}-input">Input</label>
+        <textarea id="${prefix}-input">${escapeHtml(input)}</textarea>`;
+}
+
+/**
+ * An exhibit that cannot parse its current input: its heading, the controls
+ * needed to correct the input, and the reason it was rejected — in that order,
+ * so the fix is reachable above the fold on a phone.
+ */
+function exhibitParseError(
+  heading: string,
+  prefix: string,
+  mode: InputMode,
+  input: string,
+  message: string
+): string {
+  return `<div class="panel"><h2>${heading}</h2>${exhibitControls(prefix, mode, input)}<p class="callout warn">${message}</p></div>`;
+}
+
 function renderSm3Exhibit(): string {
   const parsed = parseInput(state.sm3.input, state.sm3.mode);
   if (!parsed.ok) {
-    return `<div class="panel"><h2>Exhibit 1 — SM3 (China)</h2><p class="callout warn">${parsed.error}</p></div>`;
+    return exhibitParseError('Exhibit 1 — SM3 (China)', 'sm3', state.sm3.mode, state.sm3.input, parsed.error);
   }
 
   const original = parsed.bytes;
@@ -633,7 +679,7 @@ function renderSm3Exhibit(): string {
   }
   const mutatedParsed = parseInput(mutatedInput, state.sm3.mode);
   if (!mutatedParsed.ok) {
-    return `<div class="panel"><h2>Exhibit 1 — SM3 (China)</h2><p class="callout warn">${mutatedParsed.error}</p></div>`;
+    return exhibitParseError('Exhibit 1 — SM3 (China)', 'sm3', state.sm3.mode, state.sm3.input, mutatedParsed.error);
   }
 
   const sm3Digest = sm3DigestHex(original);
@@ -716,7 +762,7 @@ function renderSm3Exhibit(): string {
 function renderStreebogExhibit(): string {
   const parsed = parseInput(state.streebog.input, state.streebog.mode);
   if (!parsed.ok) {
-    return `<div class="panel"><h2>Exhibit 2 — Streebog (Russia)</h2><p class="callout warn">${parsed.error}</p></div>`;
+    return exhibitParseError('Exhibit 2 — Streebog (Russia)', 'streebog', state.streebog.mode, state.streebog.input, parsed.error);
   }
 
   const currentSize = state.streebog.size;
@@ -725,7 +771,7 @@ function renderStreebogExhibit(): string {
   const changedInput = mutateInput(state.streebog.input, state.streebog.mode);
   const changedParsed = parseInput(changedInput, state.streebog.mode);
   if (!changedParsed.ok) {
-    return `<div class="panel"><h2>Exhibit 2 — Streebog (Russia)</h2><p class="callout warn">${changedParsed.error}</p></div>`;
+    return exhibitParseError('Exhibit 2 — Streebog (Russia)', 'streebog', state.streebog.mode, state.streebog.input, changedParsed.error);
   }
 
   const streebogChanged = streebogHex(changedParsed.bytes, currentSize);
@@ -788,7 +834,7 @@ function renderStreebogExhibit(): string {
 function renderKupynaExhibit(): string {
   const parsed = parseInput(state.kupyna.input, state.kupyna.mode);
   if (!parsed.ok) {
-    return `<div class="panel"><h2>Exhibit 3 — Kupyna (Ukraine)</h2><p class="callout warn">${parsed.error}</p></div>`;
+    return exhibitParseError('Exhibit 3 — Kupyna (Ukraine)', 'kupyna', state.kupyna.mode, state.kupyna.input, parsed.error);
   }
 
   const currentSize = state.kupyna.size;
@@ -798,7 +844,7 @@ function renderKupynaExhibit(): string {
   const changedInput = mutateInput(state.kupyna.input, state.kupyna.mode);
   const changedParsed = parseInput(changedInput, state.kupyna.mode);
   if (!changedParsed.ok) {
-    return `<div class="panel"><h2>Exhibit 3 — Kupyna (Ukraine)</h2><p class="callout warn">${changedParsed.error}</p></div>`;
+    return exhibitParseError('Exhibit 3 — Kupyna (Ukraine)', 'kupyna', state.kupyna.mode, state.kupyna.input, changedParsed.error);
   }
   const kupynaChanged = kupynaHex(changedParsed.bytes, currentSize);
   const sha3Changed = currentSize === 256 ? sha3_256Hex(changedParsed.bytes) : sha3_512Hex(changedParsed.bytes);
@@ -1046,7 +1092,14 @@ function renderBreakItExhibit(): string {
         analogue available to an attacker with no internal state: continue from the published tag and
         compare against what the server produces. It must never match.
       </p>
-      <div class="compare-table-wrap">
+      <!-- role + tabindex, not just overflow-x. Below 860px .comparison-table
+           takes min-width:700px, so this wrapper scrolls and holds nothing
+           focusable - a WCAG 2.1.1 failure that only exists at phone width, and
+           the one axe reports as scrollable-region-focusable. role="region" is
+           what makes the aria-label legal: on a role-less div it would be
+           prohibited and silently discarded. Note this comment is inside a
+           template literal, so it must contain no backtick. -->
+      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Length-extension resistance by construction, scrollable">
         <table class="comparison-table">
           <thead><tr><th scope="col">Construction</th><th scope="col">Why the attack has no entry point</th><th scope="col">Measured result</th></tr></thead>
           <tbody id="break-resist-body">
@@ -1103,7 +1156,7 @@ function renderBreakItExhibit(): string {
 function renderAnchorsExhibit(): string {
   const parsed = parseInput(state.anchors.input, state.anchors.mode);
   if (!parsed.ok) {
-    return `<div class="panel"><h2>Exhibit 4 — SHA-256 and SHA-3 Anchors</h2><p class="callout warn">${parsed.error}</p></div>`;
+    return exhibitParseError('Exhibit 4 — SHA-256 and SHA-3 Anchors', 'anchors', state.anchors.mode, state.anchors.input, parsed.error);
   }
 
   const digests = {
@@ -1117,7 +1170,7 @@ function renderAnchorsExhibit(): string {
   const changedInput = mutateInput(state.anchors.input, state.anchors.mode);
   const changedParsed = parseInput(changedInput, state.anchors.mode);
   if (!changedParsed.ok) {
-    return `<div class="panel"><h2>Exhibit 4 — SHA-256 and SHA-3 Anchors</h2><p class="callout warn">${changedParsed.error}</p></div>`;
+    return exhibitParseError('Exhibit 4 — SHA-256 and SHA-3 Anchors', 'anchors', state.anchors.mode, state.anchors.input, changedParsed.error);
   }
 
   const changedDigests = {
@@ -1169,7 +1222,14 @@ function renderAnchorsExhibit(): string {
     <div class="panel" style="margin-top: 1rem;">
       <h3>Five-way avalanche snapshot</h3>
       <p class="small muted">Modified input used for comparison: <code>${escapeHtml(changedInput)}</code> — a strong hash flips close to 50% of output bits.</p>
-      <div class="compare-table-wrap">
+      <!-- role + tabindex, not just overflow-x. Below 860px .comparison-table
+           takes min-width:700px, so this wrapper scrolls and holds nothing
+           focusable - a WCAG 2.1.1 failure that only exists at phone width, and
+           the one axe reports as scrollable-region-focusable. role="region" is
+           what makes the aria-label legal: on a role-less div it would be
+           prohibited and silently discarded. Note this comment is inside a
+           template literal, so it must contain no backtick. -->
+      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Reference algorithm summary, scrollable">
         <table class="comparison-table">
           <thead><tr><th scope="col">Algorithm</th><th scope="col">Changed bits after one edit</th><th scope="col">Diffusion</th></tr></thead>
           <tbody>${avalancheRows}</tbody>
@@ -1183,7 +1243,14 @@ function renderDecisionExhibit(): string {
   return `
     <div class="panel">
       <h2>Exhibit 5 — Five-Way Comparison and Decision Tree</h2>
-      <div class="compare-table-wrap">
+      <!-- role + tabindex, not just overflow-x. Below 860px .comparison-table
+           takes min-width:700px, so this wrapper scrolls and holds nothing
+           focusable - a WCAG 2.1.1 failure that only exists at phone width, and
+           the one axe reports as scrollable-region-focusable. role="region" is
+           what makes the aria-label legal: on a role-less div it would be
+           prohibited and silently discarded. Note this comment is inside a
+           template literal, so it must contain no backtick. -->
+      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Five-way avalanche snapshot, scrollable">
         <table class="comparison-table">
           <thead>
             <tr>
@@ -1249,6 +1316,24 @@ function renderDecisionExhibit(): string {
   `;
 }
 
+/**
+ * Can `setSelectionRange` be called on this element without throwing?
+ *
+ * Only a <textarea> and a handful of <input> types support a text selection.
+ * Calling it on any other type — `number`, `email`, `date`, `range`, `color` —
+ * throws `InvalidStateError`, and this page has two number inputs:
+ * `#break-length` and `#collision-bits`. `render()` restores focus and the caret
+ * after rebuilding `#app`, so before this guard EVERY keystroke in either of
+ * those fields threw an uncaught exception out of `render()`. The gate's page-
+ * error watcher is what surfaced it; nothing on screen said anything was wrong,
+ * which is exactly why it had survived.
+ */
+function supportsSelection(el: Element | null): boolean {
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (!(el instanceof HTMLInputElement)) return false;
+  return ['text', 'search', 'url', 'tel', 'password'].includes(el.type);
+}
+
 function render(): void {
   const app = document.querySelector<HTMLDivElement>('#app');
   if (!app) {
@@ -1259,7 +1344,8 @@ function render(): void {
   const focusId = activeEl?.id ?? '';
   let cursorStart = 0;
   let cursorEnd = 0;
-  if (activeEl instanceof HTMLTextAreaElement || activeEl instanceof HTMLInputElement) {
+  const carryCursor = supportsSelection(activeEl);
+  if (carryCursor && (activeEl instanceof HTMLTextAreaElement || activeEl instanceof HTMLInputElement)) {
     cursorStart = activeEl.selectionStart ?? 0;
     cursorEnd = activeEl.selectionEnd ?? 0;
   }
@@ -1347,8 +1433,8 @@ function render(): void {
     const restored = document.getElementById(focusId);
     if (restored) {
       restored.focus({ preventScroll: true });
-      if (restored instanceof HTMLTextAreaElement || restored instanceof HTMLInputElement) {
-        restored.setSelectionRange(cursorStart, cursorEnd);
+      if (supportsSelection(restored)) {
+        (restored as HTMLTextAreaElement | HTMLInputElement).setSelectionRange(cursorStart, cursorEnd);
       }
     }
   }

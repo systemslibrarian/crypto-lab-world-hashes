@@ -1,88 +1,64 @@
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import {
+  boot,
+  driveAllStates,
+  expectBaselineNotStale,
+  NARROW,
+  reportCollected,
+  watchPageErrors,
+} from './gate';
 
 /**
- * WCAG regression gate. Deploys are already gated on the published KAT
- * vectors; this gates them on accessibility the same way. Scans every tab
- * panel with all live demos driven, in both themes.
+ * WCAG A/AA regression gate.
+ *
+ * The lab is driven along everything it teaches: the arrival state, where the
+ * SM3 tab is the only visible panel, five are behind the `hidden` attribute and
+ * three explainers are shut; both skip links and an inline glossary term
+ * focused; the SM3 explainers opened through their own summaries; a character
+ * flipped so the avalanche comparison, its changed nibbles and its meter render;
+ * a digest copied; all three of the parse-rejection renderings that replace a
+ * whole exhibit panel with one warning callout; Streebog and Kupyna at 512-bit,
+ * which is the only route to a 128-hex digest; the reference-anchor tab with
+ * five live digests; the attack lab in all four of its outcomes — a successful
+ * length-extension forgery against SHA-256 and again against SM3, the same
+ * forgery FAILING on a wrong secret-length guess, the resistance table, a real
+ * truncated-digest collision, and a search that exhausts its budget; the
+ * comparison tab with its seventeen known-answer vectors; and the hover state of
+ * a flip cell, an attack button and an inactive tab. Every one of those states
+ * is scanned, in both themes, at desktop and phone width.
+ *
+ * Clipboard permission is granted because `copyDigest()` awaits
+ * `navigator.clipboard.writeText` inside a `try/catch` that renders "Copy
+ * failed" on rejection: without the grant the drive would be asserting against
+ * the error branch while believing it had measured the success one.
+ *
+ * See `gate.ts` for why nothing is injected into the page, why no panel is
+ * force-revealed (the `hidden` attribute IS this lab's tab mechanism), why the
+ * lab's defaults are asserted rather than assumed, and why `violations` is not
+ * the whole oracle.
  */
 
-const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
-
-const TAB_IDS = ['sm3', 'streebog', 'kupyna', 'anchors', 'break', 'decision'];
-
-// Neutralize animations/transitions/opacity so nothing is mid-flight while axe
-// samples colours, and reveal any collapsed regions.
-async function prep(page: Page): Promise<void> {
-  await page.addStyleTag({
-    content: `*,*::before,*::after{
-      animation:none !important;
-      transition:none !important;
-    }`,
+for (const theme of ['dark', 'light'] as const) {
+  test(`no WCAG A/AA violations in ${theme} theme`, async ({ page, context }) => {
+    test.setTimeout(1_200_000);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const errors = watchPageErrors(page);
+    await boot(page, theme);
+    await driveAllStates(page, theme);
+    expect(errors, errors.join('\n')).toEqual([]);
+    expectBaselineNotStale();
+    reportCollected();
   });
-  await page.evaluate(() => {
-    for (const details of document.querySelectorAll('details')) {
-      (details as HTMLDetailsElement).open = true;
-    }
-    // Reveal any class-hidden panels so their content is scanned.
-    document
-      .querySelectorAll('[hidden]')
-      .forEach((el) => el.removeAttribute('hidden'));
+
+  test(`no WCAG A/AA violations in ${theme} theme at 380px`, async ({ page, context }) => {
+    test.setTimeout(1_200_000);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const errors = watchPageErrors(page);
+    await page.setViewportSize(NARROW);
+    await boot(page, theme);
+    await driveAllStates(page, `${theme} @380px`);
+    expect(errors, errors.join('\n')).toEqual([]);
+    expectBaselineNotStale();
+    reportCollected();
   });
 }
-
-// Drive every tab so each dynamically-rendered exhibit (with its live digest
-// output regions, tables, and avalanche cards) is present in the DOM.
-async function driveAllTabs(page: Page): Promise<void> {
-  for (const id of TAB_IDS) {
-    await page.locator(`#tab-${id}`).click();
-    await expect(page.locator(`#panel-${id}`)).toBeVisible();
-    // Exercise the input so the live-recompute output regions populate.
-    const input = page.locator(`#${id}-input`);
-    if (await input.count()) {
-      await input.fill('accessibility scan probe');
-    }
-  }
-
-  // The attack lab only renders its result regions after something is run, and
-  // both the success and failure palettes have to be scanned.
-  await page.locator('#tab-break').click();
-  await page.locator('#break-run').click();
-  await expect(page.locator('[data-attack-result="forged"]')).toBeVisible({ timeout: 30_000 });
-  await page.locator('#break-run-resistant').click();
-  await expect(page.locator('[data-resist-row="kupyna256"]')).toBeVisible({ timeout: 30_000 });
-  await page.locator('#collision-run').click();
-  await expect(page.locator('[data-collision-verdict="collision"]')).toBeVisible({ timeout: 60_000 });
-  await page.locator('#break-run-wrong').click();
-  await expect(page.locator('[data-attack-result="not-forged"]')).toBeVisible({ timeout: 30_000 });
-  await page.locator('#collision-run-starved').click();
-  await expect(page.locator('[data-collision-verdict="exhausted"]')).toBeVisible({ timeout: 30_000 });
-}
-
-async function scan(page: Page): Promise<void> {
-  await prep(page);
-  const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
-  const summary = results.violations.map((v) => ({
-    id: v.id,
-    impact: v.impact,
-    help: v.help,
-    nodes: v.nodes.map((n) => n.target.join(' ')).slice(0, 5),
-  }));
-  expect(summary).toEqual([]);
-}
-
-test('no WCAG A/AA violations in dark theme', async ({ page }) => {
-  await page.goto('.');
-  await expect(page.locator('#app .app-shell')).toBeVisible();
-  await driveAllTabs(page);
-  await scan(page);
-});
-
-test('no WCAG A/AA violations in light theme', async ({ page }) => {
-  await page.goto('.');
-  await expect(page.locator('#app .app-shell')).toBeVisible();
-  await page.locator('#cl-theme-toggle').click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await driveAllTabs(page);
-  await scan(page);
-});
