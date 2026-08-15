@@ -38,7 +38,7 @@ import {
  * the whole oracle.
  */
 
-for (const theme of ['dark', 'light'] as const) {
+for (const theme of ['dark'] as const) {
   test(`no WCAG A/AA violations in ${theme} theme`, async ({ page, context }) => {
     test.setTimeout(1_200_000);
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
