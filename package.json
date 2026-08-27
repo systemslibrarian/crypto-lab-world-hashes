@@ -30,17 +30,17 @@
     "@li0ard/kupyna": "^0.1.4",
     "@li0ard/streebog": "^0.2.6",
     "@noble/hashes": "^2.3.0",
-    "sm-crypto": "^0.5.4"
+    "sm-crypto": "^0.5.7"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
     "axe-core": "^4.12.1",
     "gh-pages": "^6.3.0",
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^20.11.6",
     "typescript": "^5.6.3",
-    "vite": "^8.2.0",
-    "vitest": "^4.1.10"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   },
   "allowScripts": {
     "esbuild@0.27.7": true
