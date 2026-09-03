@@ -29,7 +29,7 @@
   "dependencies": {
     "@li0ard/kupyna": "^0.1.4",
     "@li0ard/streebog": "^0.2.6",
-    "@noble/hashes": "^2.3.0",
+    "@noble/hashes": "^2.4.0",
     "sm-crypto": "^0.5.7"
   },
   "devDependencies": {
@@ -37,7 +37,7 @@
     "@playwright/test": "^1.62.1",
     "axe-core": "^4.12.1",
     "gh-pages": "^6.3.0",
-    "happy-dom": "^20.11.6",
+    "happy-dom": "^20.12.0",
     "typescript": "^5.6.3",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"
