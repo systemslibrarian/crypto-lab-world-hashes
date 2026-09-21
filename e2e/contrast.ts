@@ -435,7 +435,7 @@ export async function auditContrast(page: Page, within = 'body *'): Promise<Cont
      * Style and geometry are memoised per element for one pass.
      *
      * A driven pass here walks the whole SPA at once — five inactive tab panels
-     * are still in the DOM behind the `hidden` attribute — plus an eighteen-row
+     * are still in the DOM behind the `hidden` attribute — plus a nineteen-row
      * known-answer table, three SVG figures and, the expensive part, the
      * 61-button avalanche flip strip and the per-nibble `<span>`s of every
      * changed digest. Without the caches the pass re-reads the same computed

@@ -19,11 +19,11 @@ import {
  * a digest copied; all three of the parse-rejection renderings that replace a
  * whole exhibit panel with one warning callout; Streebog and Kupyna at 512-bit,
  * which is the only route to a 128-hex digest; the reference-anchor tab with
- * six live digests; the attack lab in all four of its outcomes — a successful
+ * seven live digests; the attack lab in all four of its outcomes — a successful
  * length-extension forgery against SHA-256 and again against SM3, the same
  * forgery FAILING on a wrong secret-length guess, the resistance table, the
  * negative claim it renders underneath, a real truncated-digest collision, and a
- * search that exhausts its budget; the comparison tab with its eighteen
+ * search that exhausts its budget; the comparison tab with its nineteen
  * known-answer vectors; and the hover state of a flip cell, an attack button and
  * an inactive tab. Every one of those states is scanned, in both themes, at
  * desktop and phone width.

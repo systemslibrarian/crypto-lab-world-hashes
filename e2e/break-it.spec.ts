@@ -77,14 +77,14 @@ test('a wrong secret-length guess makes the forgery fail, and the page says why'
   await expect(result).toHaveAttribute('data-attack-result', 'forged', { timeout: 30_000 });
 });
 
-test('SHA-3, Bash, Kupyna, Streebog and HMAC all hold against the same attempt', async ({
+test('SHA-3, Bash, Kupyna, LSH, Streebog and HMAC all hold against the same attempt', async ({
   page,
 }) => {
   await page.locator('#break-run-resistant').click();
 
   const rows = page.locator('[data-resist-row]');
-  await expect(rows).toHaveCount(5);
-  for (const id of ['sha3-256', 'bash256', 'kupyna256', 'streebog256', 'hmac-sha256']) {
+  await expect(rows).toHaveCount(6);
+  for (const id of ['sha3-256', 'bash256', 'kupyna256', 'lsh256', 'streebog256', 'hmac-sha256']) {
     const row = page.locator(`[data-resist-row="${id}"]`);
     await expect(row.locator('[data-resist-outcome]')).toHaveAttribute(
       'data-resist-outcome',
@@ -98,6 +98,7 @@ test('SHA-3, Bash, Kupyna, Streebog and HMAC all hold against the same attempt',
   );
   await expect(page.locator('[data-resist-row="sha3-256"]')).toContainText('Sponge');
   await expect(page.locator('[data-resist-row="bash256"]')).toContainText('Sponge');
+  await expect(page.locator('[data-resist-row="lsh256"]')).toContainText('Wide-pipe');
   await expect(page.locator('[data-resist-row="streebog256"]')).toContainText('checksum');
 });
 
@@ -120,7 +121,7 @@ test('Bash holds as a sponge, without being credited with a defence it has not g
   );
   // …and the distinction is a real one: the two constructions that do add a
   // mechanism are marked differently.
-  for (const id of ['kupyna256', 'streebog256']) {
+  for (const id of ['kupyna256', 'streebog256', 'lsh256']) {
     await expect(page.locator(`[data-resist-row="${id}"] [data-countermeasure]`)).toHaveAttribute(
       'data-countermeasure',
       'added',

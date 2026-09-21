@@ -73,6 +73,42 @@ test('Bash is hashed live, and its KAT row is sourced to the clause it comes fro
   await expect(bashCard.locator('.digest-block')).toHaveText(/^[0-9a-f]{64}$/);
 });
 
+test('LSH is hashed live, and its hand-rolled maths is pinned to two sources', async ({
+  page,
+}) => {
+  await page.goto('.');
+  await page.locator('#tab-decision').click();
+
+  // LSH's KAT row names what it is pinned to — and, unusually, names what it is
+  // NOT pinned to. The standard itself was not consulted, and the page says so
+  // rather than implying an authority the lab does not have.
+  const table = page.locator('#panel-decision .kat-table');
+  const lshRow = table.locator('tbody tr', { hasText: 'LSH-256' });
+  await expect(lshRow).toHaveCount(1);
+  await expect(lshRow).toContainText('published LSH reference value');
+  await expect(lshRow).toContainText('KS X 3262 not consulted directly');
+  await expect(lshRow.locator('.kat-pass')).toBeVisible();
+
+  // One pinned digest cannot vouch for a transcribed primitive, so the page
+  // recomputes the whole shipped vector set on load and reports the result.
+  await expect(page.locator('#lsh-crosscheck .kat-pass')).toBeVisible();
+  await expect(page.locator('#lsh-crosscheck .kat-fail')).toHaveCount(0);
+  const note = (await page.locator('#lsh-crosscheck').textContent()) ?? '';
+  const [, reproduced, vectors] = note.match(/(\d+)\/(\d+) published LSH vectors/) ?? [];
+  expect(Number(reproduced)).toBe(Number(vectors));
+  expect(Number(vectors)).toBeGreaterThanOrEqual(12);
+
+  // The surrounding prose states the two-source claim the vector table embodies.
+  const panel = page.locator('#panel-decision');
+  await expect(panel).toContainText('no npm implementation at all');
+  await expect(panel).toContainText('corroborate rather than repeat each other');
+
+  // And the digest really is computed in the browser.
+  await page.locator('#tab-anchors').click();
+  const card = page.locator('#panel-anchors .card', { hasText: 'LSH-256' }).first();
+  await expect(card.locator('.digest-block')).toHaveText(/^[0-9a-f]{64}$/);
+});
+
 test('the Bash trust grade is for the algorithm, with the tooling defect kept on record', async ({
   page,
 }) => {
@@ -152,10 +188,10 @@ test('negative claim: Bash has no length-extension defence, and needs none', asy
   // ── 2. Everything on screen reports success ─────────────────────────────
   // Asserted against the rendered verdicts, not a flag this test sets.
   const outcomes = page.locator('[data-resist-outcome]');
-  await expect(outcomes).toHaveCount(5);
+  await expect(outcomes).toHaveCount(6);
   expect(await outcomes.evaluateAll((nodes) =>
     nodes.map((n) => n.getAttribute('data-resist-outcome')),
-  )).toEqual(['held', 'held', 'held', 'held', 'held']);
+  )).toEqual(['held', 'held', 'held', 'held', 'held', 'held']);
   await expect(page.locator('#break-resist-body .kat-fail')).toHaveCount(0);
   await expect(page.locator('.badge-failed')).toHaveCount(0);
   // The forgery against SHA-256 succeeded, which is what makes the contrast in
