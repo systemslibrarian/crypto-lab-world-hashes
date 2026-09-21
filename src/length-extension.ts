@@ -361,7 +361,7 @@ export function attemptLengthExtension(
 
 /* ------------------------------------------------- the constructions that resist */
 
-export type ResistantAlgorithm = 'sha3-256' | 'kupyna256' | 'streebog256' | 'bash256';
+export type ResistantAlgorithm = 'sha3-256' | 'kupyna256' | 'streebog256' | 'bash256' | 'lsh256';
 
 export type ComparedAlgorithm = ExtendableAlgorithm | ResistantAlgorithm | 'hmac-sha256';
 
@@ -428,6 +428,13 @@ export const CONSTRUCTIONS: Record<ComparedAlgorithm, Construction> = {
     stateBits: 512,
     digestBits: 256,
     countermeasure: 'output transformation Ω truncates the wide state',
+  },
+  lsh256: {
+    label: 'LSH-256',
+    family: 'Wide-pipe',
+    stateBits: 512,
+    digestBits: 256,
+    countermeasure: 'final XOR-fold of the two 256-bit halves of the chaining variable',
   },
   streebog256: {
     label: 'Streebog-256',
@@ -565,6 +572,14 @@ export function checkResistance(
       reason:
         'Wide-pipe Merkle–Damgård. The internal state is twice the digest width and is finalized ' +
         'and truncated before output, so the published digest is not a resumable chaining value.',
+    },
+    lsh256: {
+      label: 'LSH-256',
+      reason:
+        'Wide-pipe. The 512-bit chaining variable is folded in half at the end — the two 256-bit ' +
+        'halves are XORed together — so the digest is a compression of the state rather than the ' +
+        'state itself. Notably LSH encodes no message length in its padding at all; the wide pipe ' +
+        'is doing the whole job.',
     },
     streebog256: {
       label: 'Streebog-256',

@@ -5,6 +5,7 @@ import { sha3_256, sha3_512 } from '@noble/hashes/sha3.js';
 import { sm3 as sm3Hash } from 'sm-crypto';
 
 import { bash256 } from './bash';
+import { lsh256 } from './lsh';
 
 /**
  * Single source of truth for every hash function in the demo.
@@ -23,7 +24,8 @@ export type AlgorithmId =
   | 'streebog512'
   | 'kupyna256'
   | 'kupyna512'
-  | 'bash256';
+  | 'bash256'
+  | 'lsh256';
 
 export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
@@ -42,7 +44,10 @@ const IMPLEMENTATIONS: Record<AlgorithmId, (bytes: Uint8Array) => string> = {
   // Bash is the one algorithm here whose sponge is implemented in this repo
   // rather than imported: `@li0ard/bash`'s wrapper gets the rate wrong and
   // fails 7 of the 11 published vectors. See the header of ./bash.ts.
-  bash256: (bytes) => bytesToHex(bash256(bytes))
+  bash256: (bytes) => bytesToHex(bash256(bytes)),
+  // LSH likewise: there is no LSH on npm at all (the "lsh" packages are
+  // locality-sensitive hashing), so it is implemented here. See ./lsh.ts.
+  lsh256: (bytes) => bytesToHex(lsh256(bytes))
 };
 
 /** Human-readable labels, used in headings and result cards. */
@@ -56,7 +61,8 @@ export const ALGORITHM_LABELS: Record<AlgorithmId, string> = {
   streebog512: 'Streebog-512',
   kupyna256: 'Kupyna-256',
   kupyna512: 'Kupyna-512',
-  bash256: 'Bash-256'
+  bash256: 'Bash-256',
+  lsh256: 'LSH-256'
 };
 
 /** Digest length in bits, used to report avalanche statistics. */
@@ -70,7 +76,8 @@ export const ALGORITHM_BITS: Record<AlgorithmId, number> = {
   streebog512: 512,
   kupyna256: 256,
   kupyna512: 512,
-  bash256: 256
+  bash256: 256,
+  lsh256: 256
 };
 
 export function computeHex(algorithm: AlgorithmId, bytes: Uint8Array): string {
@@ -122,7 +129,12 @@ export const TEST_VECTORS: TestVector[] = [
   // empty message and so is expressible as the UTF-8 text this table shows;
   // the other ten hash the Belarusian binary test string and are checked in
   // src/bash.test.ts, where they span the sponge's rate boundary.
-  { algorithm: 'bash256', input: '', inputLabel: 'empty string', expected: '114c3dfae373d9bcbc3602d6386f2d6a2059ba1bf9048dbaa5146a6cb775709d', source: 'STB 34.101.77 §A.3.1' }
+  { algorithm: 'bash256', input: '', inputLabel: 'empty string', expected: '114c3dfae373d9bcbc3602d6386f2d6a2059ba1bf9048dbaa5146a6cb775709d', source: 'STB 34.101.77 §A.3.1' },
+  // LSH — KS X 3262. The "abc" digest is the published LSH reference value and
+  // is not derived from the Crypto++ data the rest of src/lsh.ts checks
+  // against, so the two sources corroborate rather than repeat each other.
+  // KS X 3262 itself was not consulted directly; the label says so.
+  { algorithm: 'lsh256', input: 'abc', inputLabel: '"abc"', expected: '5fbf365daea5446a7053c52b57404d77a07a5f48a1f7c1963a0898ba1b714741', source: 'published LSH reference value (KS X 3262 not consulted directly)' }
 ];
 
 export interface SelfTestResult {

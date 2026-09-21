@@ -373,7 +373,7 @@ export async function auditNonText(page: Page, within = 'body *'): Promise<NonTe
      * Style and geometry are memoised per element for one pass.
      *
      * A driven pass here walks the whole SPA at once — five inactive tab panels
-     * are still in the DOM behind the `hidden` attribute — plus an eighteen-row
+     * are still in the DOM behind the `hidden` attribute — plus a nineteen-row
      * known-answer table and, the expensive part, the 61-button avalanche flip
      * strip. Without the caches the pass re-reads the same computed styles and
      * rects tens of thousands of times. Nothing mutates the DOM during the pass,

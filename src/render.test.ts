@@ -52,6 +52,18 @@ describe('known-answer verification panel', () => {
   });
 });
 
+describe('LSH is presented as wide-pipe, and hashed live', () => {
+  it('appears in the anchors exhibit with a real digest', () => {
+    document.querySelector<HTMLButtonElement>('[data-tab-target="anchors"]')?.click();
+    const panel = document.getElementById('panel-anchors');
+    expect(panel?.textContent).toContain('LSH-256');
+    const card = Array.from(panel?.querySelectorAll('.card') ?? []).find((c) =>
+      c.textContent?.includes('LSH-256'),
+    );
+    expect(card?.querySelector('.digest-block')?.textContent).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
 describe('Bash is presented as a sponge, alongside SHA-3 rather than instead of it', () => {
   it('names both sponges in the anchors exhibit and hashes Bash live', () => {
     document.querySelector<HTMLButtonElement>('[data-tab-target="anchors"]')?.click();
@@ -119,8 +131,8 @@ describe('the Break-it attack lab renders only computed verdicts', () => {
   it('shows the resistant constructions holding, each from a real attempt', () => {
     document.querySelector<HTMLButtonElement>('#break-run-resistant')?.click();
     const rows = document.querySelectorAll('[data-resist-row]');
-    // Five since Bash joined SHA-3, Kupyna, Streebog and HMAC (was four).
-    expect(rows).toHaveLength(5);
+    // Six since LSH joined SHA-3, Bash, Kupyna, Streebog and HMAC (was five).
+    expect(rows).toHaveLength(6);
     for (const row of rows) {
       expect(row.querySelector('[data-resist-outcome]')?.getAttribute('data-resist-outcome')).toBe('held');
     }
@@ -128,6 +140,7 @@ describe('the Break-it attack lab renders only computed verdicts', () => {
     expect(body?.querySelector('[data-resist-row="kupyna256"]')?.textContent).toContain('Wide-pipe');
     expect(body?.querySelector('[data-resist-row="sha3-256"]')?.textContent).toContain('Sponge');
     expect(body?.querySelector('[data-resist-row="bash256"]')?.textContent).toContain('Sponge');
+    expect(body?.querySelector('[data-resist-row="lsh256"]')?.textContent).toContain('Wide-pipe');
   });
 
   it('presents Bash as needing no countermeasure, not as defending itself', () => {
@@ -137,9 +150,10 @@ describe('the Break-it attack lab renders only computed verdicts', () => {
     expect(bash?.querySelector('[data-countermeasure]')?.getAttribute('data-countermeasure')).toBe(
       'none',
     );
-    // …while the two constructions that DO add a mechanism are marked as such,
-    // so "none" is a distinction the table can actually draw.
-    for (const id of ['kupyna256', 'streebog256']) {
+    // …while the constructions that DO add a mechanism are marked as such, so
+    // "none" is a distinction the table can actually draw. LSH is one of them:
+    // it folds its 512-bit chaining variable in half before output.
+    for (const id of ['kupyna256', 'streebog256', 'lsh256']) {
       expect(
         document
           .querySelector(`[data-resist-row="${id}"] [data-countermeasure]`)

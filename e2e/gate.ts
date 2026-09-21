@@ -205,8 +205,8 @@ export async function assertSingleBanner(page: Page): Promise<void> {
  * rendered by JavaScript into an empty `<div id="app">`. A navigation that
  * resolves proves nothing at all here: the whole document, hero to footer, comes
  * out of one `innerHTML` assignment, and every digest on it is computed at
- * render time. The KAT self-test in particular is asserted at 18/18 rather than
- * merely present, because a page that says "3/18 vectors FAILED" is still a
+ * render time. The KAT self-test in particular is asserted at 19/19 rather than
+ * merely present, because a page that says "3/19 vectors FAILED" is still a
  * page a gate can scan and call green.
  */
 export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
@@ -270,7 +270,7 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   await expect(page.locator('details[open]')).toHaveCount(0);
 
   // ── The live self-test, and the digests it vouches for ───────────────────
-  await expect(page.locator('.badge-verified')).toHaveText('✓ 18/18 test vectors verified');
+  await expect(page.locator('.badge-verified')).toHaveText('✓ 19/19 test vectors verified');
   await expect(page.locator('.badge-failed')).toHaveCount(0);
 
   // ── Every shipped control default ────────────────────────────────────────
@@ -791,11 +791,11 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await openDisclosures(page, 1);
   await scanAt('Kupyna tab with the intro disclosure open');
 
-  // ── Exhibit 4: the reference anchors, six digests at once ────────────────
+  // ── Exhibit 4: the reference anchors, seven digests at once ──────────────
   await openTab(page, 'anchors');
   await expect(page.locator('#panel-anchors .digest-block').first()).toHaveText(/^[0-9a-f]{64}$/);
   await expect(page.locator('#panel-anchors .comparison-table')).toBeVisible();
-  await scanAt('Anchors tab, six digests and the six-way avalanche table');
+  await scanAt('Anchors tab, seven digests and the seven-way avalanche table');
 
   // ── Exhibit 5: the attack lab, all four outcomes ─────────────────────────
   await openTab(page, 'break');
@@ -848,8 +848,9 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await page.click('#break-run-resistant');
   await expect(page.locator('[data-resist-row="kupyna256"]')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('[data-resist-row="bash256"]')).toBeVisible();
+  await expect(page.locator('[data-resist-row="lsh256"]')).toBeVisible();
   await expect(page.locator('#break-resist-body tr').first()).toBeVisible();
-  await scanAt('the resistance table, both sponges and the wide-pipe holding');
+  await scanAt('the resistance table, both sponges and both wide-pipes holding');
 
   // The negative claim (template 4.1d) only renders once the lineup has run, so
   // it is a distinct rendered state and gets its own scan.
@@ -877,14 +878,17 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
 
   // ── Exhibit 6: the comparison tab, which carries the KAT table ───────────
   await openTab(page, 'decision');
-  await expect(page.locator('#panel-decision .kat-table tbody tr')).toHaveCount(18);
-  await expect(page.locator('#panel-decision .kat-table .kat-pass')).toHaveCount(18);
+  await expect(page.locator('#panel-decision .kat-table tbody tr')).toHaveCount(19);
+  await expect(page.locator('#panel-decision .kat-table .kat-pass')).toHaveCount(19);
   await expect(page.locator('#panel-decision .kat-table .kat-fail')).toHaveCount(0);
   // Bash's sponge is implemented in this repo rather than imported, so the
   // panel also reports the published-vector check that justifies its KAT row.
   await expect(page.locator('#bash-crosscheck .kat-pass')).toBeVisible();
   await expect(page.locator('#bash-crosscheck .kat-fail')).toHaveCount(0);
-  await scanAt('Comparison tab, eighteen known-answer vectors listed as passing');
+  // LSH is the other hand-rolled primitive and carries the same report.
+  await expect(page.locator('#lsh-crosscheck .kat-pass')).toBeVisible();
+  await expect(page.locator('#lsh-crosscheck .kat-fail')).toHaveCount(0);
+  await scanAt('Comparison tab, nineteen known-answer vectors listed as passing');
 
   await page.locator('#tab-sm3').hover();
   await scanAt('the finished page with an inactive tab hovered');
