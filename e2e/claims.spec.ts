@@ -73,6 +73,51 @@ test('Bash is hashed live, and its KAT row is sourced to the clause it comes fro
   await expect(bashCard.locator('.digest-block')).toHaveText(/^[0-9a-f]{64}$/);
 });
 
+test('the Bash trust grade is for the algorithm, with the tooling defect kept on record', async ({
+  page,
+}) => {
+  await page.goto('.');
+  await page.locator('#tab-decision').click();
+
+  // The visible grade. Read off the cell's own text node so the footnote
+  // marker in the <sup> does not get folded into it.
+  const gradeCell = page.locator('[data-trust-grade="bash256"]');
+  await expect(gradeCell).toBeVisible();
+  const cellGrade = (
+    await gradeCell.evaluate((el) => el.childNodes[0]?.textContent ?? '')
+  ).trim();
+  expect(cellGrade).toBe('High');
+
+  // The derivation note behind the disclosure must state the SAME grade — two
+  // surfaces rendering one claim, so a regrade that updates only one is caught.
+  const notes = page.locator('#panel-decision details.explainer');
+  await notes.locator('summary').click();
+  const bashNote = notes.locator('li', { hasText: 'Bash —' });
+  await expect(bashNote).toHaveCount(1);
+  const noteGrade = ((await bashNote.textContent()) ?? '').match(/Bash\s+—\s+([^.]+)\./)?.[1] ?? '';
+  expect(noteGrade.trim()).toBe(cellGrade);
+
+  // The grade is scoped to the algorithm, not to what you can install.
+  await expect(bashNote).toContainText('This grade is for the algorithm');
+  await expect(bashNote).toContainText('Tooling caveat, counted separately');
+
+  // And the concrete defect that caveat exists for stays on the record: the
+  // count, the root cause, and what this lab does about it. Softening any of
+  // these to a vague "immature tooling" note fails here.
+  await expect(bashNote).toContainText('@li0ard/bash');
+  await expect(bashNote).toContainText('7 of the 11');
+  await expect(bashNote).toContainText('Annex A');
+  await expect(bashNote).toContainText('security level in bits with the digest length in bytes');
+  await expect(bashNote).toContainText('wrong rate');
+  await expect(bashNote).toContainText('XORs each block into the state where the standard overwrites');
+  await expect(bashNote).toContainText('src/bash.ts');
+
+  // The claim the caveat rests on is the one the page can actually back: this
+  // lab's own sponge reproduces every published vector.
+  await expect(page.locator('#bash-crosscheck .kat-pass')).toBeVisible();
+  await expect(page.locator('#bash-crosscheck .kat-fail')).toHaveCount(0);
+});
+
 /**
  * The negative claim (template §4.1d).
  *
