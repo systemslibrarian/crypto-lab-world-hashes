@@ -2,11 +2,13 @@ import './styles.css';
 
 import { ALGORITHM_LABELS, computeHex, runSelfTest } from './hashes';
 import type { AlgorithmId, SelfTestReport } from './hashes';
+import { crossCheckBash } from './bash';
 import {
   EXTENDABLE_ALGORITHMS,
   attemptLengthExtension,
   checkResistance,
   crossCheckImplementations,
+  noDefenceEvidence,
 } from './length-extension';
 import type { ExtendableAlgorithm, ExtensionAttempt, ResistanceResult } from './length-extension';
 import {
@@ -70,7 +72,7 @@ const state: {
     size: 256
   },
   anchors: {
-    input: 'One message, five standards, five distinct digests.',
+    input: 'One message, six standards, six distinct digests.',
     mode: 'text'
   },
   break: {
@@ -115,6 +117,16 @@ const selfTest: SelfTestReport = runSelfTest();
 // forgery rather than show one it cannot justify.
 const crossChecks = crossCheckImplementations();
 const crossChecksAgree = crossChecks.every((check) => check.agrees);
+
+// Bash is the one algorithm whose sponge this repo implements rather than
+// imports, because the bundled library's wrapper miscomputes the rate and fails
+// 7 of the 11 vectors in STB 34.101.77 Annex A. So the same discipline applies:
+// every published Bash vector — the bash-f permutation and all eleven hash
+// vectors — is recomputed on load, and the page says so rather than asking to
+// be trusted.
+const bashChecks = crossCheckBash();
+const bashCheckFailures = bashChecks.filter((check) => !check.agrees).length;
+const bashChecksAgree = bashCheckFailures === 0;
 
 function escapeHtml(input: string): string {
   return input
@@ -220,6 +232,7 @@ const streebogHex = (bytes: Uint8Array, size: DigestSize): string =>
   computeHex(size === 256 ? 'streebog256' : 'streebog512', bytes);
 const kupynaHex = (bytes: Uint8Array, size: DigestSize): string =>
   computeHex(size === 256 ? 'kupyna256' : 'kupyna512', bytes);
+const bashHex = (bytes: Uint8Array): string => computeHex('bash256', bytes);
 
 function changedHexBits(a: string, b: string): number {
   const maxLength = Math.max(a.length, b.length);
@@ -313,6 +326,9 @@ function verificationBadge(): string {
 
 /** Full known-answer table: input → authoritative source → live pass/fail. */
 function verificationPanel(): string {
+  const bashCheckNote = bashChecksAgree
+    ? `<span class="kat-pass">✓ ${bashChecks.length}/${bashChecks.length} published Bash vectors reproduced</span>`
+    : `<span class="kat-fail">✕ ${bashCheckFailures} of ${bashChecks.length} Bash vectors FAILED</span>`;
   const rows = selfTest.results
     .map((r) => {
       const status = r.pass
@@ -348,6 +364,15 @@ function verificationPanel(): string {
           <tbody>${rows}</tbody>
         </table>
       </div>
+      <p class="small muted" style="max-width:76ch;">
+        <strong>One algorithm needs more than a row here.</strong> Bash is the only hash in this lab
+        whose sponge is implemented in this repo rather than imported: the npm package the lab depends
+        on ships a correct <code>bash-f</code> permutation but wraps it in a sponge that miscomputes
+        the rate, and it fails 7 of the 11 hash vectors in STB 34.101.77 Annex A — all of them at or
+        above one block, which is why its own test suite does not catch it. Only the empty-message
+        vector, §A.3.1, has an input this table can print, so the other ten are recomputed on load
+        too: <span id="bash-crosscheck">${bashCheckNote}</span>.
+      </p>
     </div>
   `;
 }
@@ -883,7 +908,7 @@ function renderKupynaExhibit(): string {
         <p class="small muted">Kupyna does chain blocks, like SM3 and SHA-256 — but over a state twice the digest width, and it never hands that state out directly. A final output transformation truncates it:</p>
         ${widePipeDiagram()}
         <ul class="small">
-          <li>Kupyna is a ${gloss('wide-pipe')} ${gloss('Merkle-Damgard', 'Merkle–Damgård')} hash, structurally close to the SHA-3 finalist Grøstl — <strong>not</strong> a ${gloss('sponge')}. SHA-3 is the sponge in this comparison; Kupyna is the wide-pipe alternative.</li>
+          <li>Kupyna is a ${gloss('wide-pipe')} ${gloss('Merkle-Damgard', 'Merkle–Damgård')} hash, structurally close to the SHA-3 finalist Grøstl — <strong>not</strong> a ${gloss('sponge')}. SHA-3 and Bash are the sponges in this comparison; Kupyna is the wide-pipe alternative.</li>
           <li>Its compression step is <code>h<sub>i</sub> = T<sup>⊕</sup>(h<sub>i−1</sub> ⊕ m<sub>i</sub>) ⊕ T<sup>+</sup>(m<sub>i</sub>) ⊕ h<sub>i−1</sub></code>, built from two permutations taken from the Kalyna block cipher (DSTU 7624:2014).</li>
           <li>Kupyna-256 uses a 512-bit state with 10 rounds per permutation; Kupyna-512 uses a 1024-bit state with 14 rounds.</li>
           <li>SHA-3 uses ${gloss('Keccak-f[1600]')} with 24 rounds of θ (theta), ρ (rho), π (pi), χ (chi), and ι (iota).</li>
@@ -918,7 +943,7 @@ function renderKupynaExhibit(): string {
    from the attempt the learner just made.
    ========================================================================== */
 
-const RESISTANT_LINEUP = ['sha3-256', 'kupyna256', 'streebog256', 'hmac-sha256'] as const;
+const RESISTANT_LINEUP = ['sha3-256', 'bash256', 'kupyna256', 'streebog256', 'hmac-sha256'] as const;
 
 function renderExtensionResult(attempt: ExtensionAttempt): string {
   const forged = attempt.forged;
@@ -966,6 +991,16 @@ function renderExtensionResult(attempt: ExtensionAttempt): string {
     </div>`;
 }
 
+/**
+ * One row per construction: why the attack has no entry point, what the design
+ * ADDS to stop it (often nothing), how many state bits the digest withholds,
+ * and the measured outcome.
+ *
+ * The countermeasure cell is the load-bearing one. Bash and SHA-3 add nothing —
+ * and so does SHA-256, which is forged in the panel above. Printing `none` in
+ * all three places is the point: the difference between them is the withheld-
+ * bits column beside it, not a defence one of them bolted on.
+ */
 function renderResistanceRows(results: ResistanceResult[]): string {
   return results
     .map(
@@ -973,6 +1008,14 @@ function renderResistanceRows(results: ResistanceResult[]): string {
       <tr data-resist-row="${r.algorithm}">
         <td><strong>${escapeHtml(r.label)}</strong></td>
         <td class="small">${escapeHtml(r.reason)}</td>
+        <td class="small" data-countermeasure="${r.construction.countermeasure === null ? 'none' : 'added'}">
+          ${r.construction.countermeasure === null
+            ? '<em>none — and none needed</em>'
+            : escapeHtml(r.construction.countermeasure)}
+        </td>
+        <td class="small" data-withheld-bits="${r.unexposedStateBits}">
+          <strong>${r.unexposedStateBits}</strong> of ${r.construction.stateBits}
+        </td>
         <td data-resist-outcome="${r.forged ? 'forged' : 'held'}">
           ${r.forged
             ? '<span class="kat-fail">✕ FORGED — this must not happen</span>'
@@ -981,6 +1024,70 @@ function renderResistanceRows(results: ResistanceResult[]): string {
       </tr>`,
     )
     .join('');
+}
+
+/**
+ * The lab's negative claim (template §4.1d), rendered only once the resistance
+ * lineup has actually been run — so it is attached to a measured state rather
+ * than standing as prose on an untouched page.
+ *
+ * The claim names a property Bash does NOT have: any length-extension
+ * countermeasure whatsoever. The fixture is the state where every verdict on
+ * screen reads success — five constructions held, the forgery above succeeded
+ * against SHA-256, the self-test and both cross-checks are green — and the
+ * limitation is on screen in that same state: "held" for Bash means the attack
+ * has no entry point, not that the tag is authenticated.
+ *
+ * Every number here comes from `noDefenceEvidence()`, which computes them from
+ * the construction geometry. Nothing in this string states a quantity of its own.
+ */
+function renderNegativeClaim(): string {
+  const evidence = noDefenceEvidence();
+  const { immune, forgeable } = evidence;
+  // A claim about what Bash does not need is only worth making if this repo's
+  // Bash is the one the standard describes. If the published-vector check ever
+  // failed, the page withdraws the claim rather than restating it over a
+  // primitive it can no longer vouch for.
+  if (!bashChecksAgree) {
+    return `
+    <div class="callout warn attack-verdict" data-negative-claim="withdrawn">
+      <strong>CLAIM WITHDRAWN — the Bash implementation no longer reproduces its published vectors.</strong>
+      <p class="small" style="margin:.4rem 0 0;">
+        ${bashCheckFailures} of ${bashChecks.length} STB 34.101.77 vectors failed on this load, so nothing
+        is claimed about what this construction does or does not need.
+      </p>
+    </div>`;
+  }
+  return `
+    <div class="callout attack-verdict negative-claim" data-negative-claim="no-countermeasure">
+      <strong>NO DEFENCE — AND NOTHING TO DEFEND.</strong>
+      <p class="small" style="margin:.4rem 0 0;">
+        ${escapeHtml(immune.label)} carries <strong>no length-extension countermeasure at all</strong> —
+        no length encoding, no checksum, no output transformation.
+        <strong>Neither does ${escapeHtml(forgeable.label)}</strong>, and ${escapeHtml(forgeable.label)} is
+        forged in the panel above. So the absence of a defence is not what saves the sponge, and this page
+        will not dress it up as one.
+      </p>
+      <p class="small" style="margin:.4rem 0 0;">
+        What separates them is measured, not argued — how much internal state the published digest
+        <em>withholds</em>:
+        ${escapeHtml(forgeable.label)} withholds
+        <strong id="claim-forgeable-withheld">${forgeable.unexposedStateBits}</strong>
+        of <span id="claim-forgeable-state">${forgeable.stateBits}</span> bits — the digest
+        <em>is</em> the chaining state, which is exactly the precondition the forgery needs —
+        while ${escapeHtml(immune.label)} withholds
+        <strong id="claim-immune-withheld">${immune.unexposedStateBits}</strong>
+        of <span id="claim-immune-state">${immune.stateBits}</span>.
+        There is no countermeasure on either side; there is only a construction that hands out its
+        state and one that does not.
+      </p>
+      <p class="small" style="margin:.4rem 0 0;">
+        <strong>And what that absence does not buy is authentication.</strong> A green row for
+        ${escapeHtml(immune.label)} below means this attack has <em>no entry point</em> — not that
+        <code>tag = bash256(secret ‖ message)</code> is a sound MAC. Nothing on this page tests it as one.
+        HMAC remains the portable answer.
+      </p>
+    </div>`;
 }
 
 function renderCollisionResult(result: CollisionResult): string {
@@ -1092,6 +1199,13 @@ function renderBreakItExhibit(): string {
         analogue available to an attacker with no internal state: continue from the published tag and
         compare against what the server produces. It must never match.
       </p>
+      <p class="small muted" style="max-width:74ch;">
+        Read the <strong>Countermeasure</strong> column before the verdict. Two of these constructions
+        add a specific mechanism to stop length extension; the rest add nothing whatsoever — the same
+        nothing SHA-256 has in the panel above, where the forgery succeeds. The column beside it is
+        what actually decides the outcome: how many bits of internal state the published digest never
+        reveals.
+      </p>
       <!-- role + tabindex, not just overflow-x. Below 860px .comparison-table
            takes min-width:700px, so this wrapper scrolls and holds nothing
            focusable - a WCAG 2.1.1 failure that only exists at phone width, and
@@ -1101,16 +1215,19 @@ function renderBreakItExhibit(): string {
            template literal, so it must contain no backtick. -->
       <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Length-extension resistance by construction, scrollable">
         <table class="comparison-table">
-          <thead><tr><th scope="col">Construction</th><th scope="col">Why the attack has no entry point</th><th scope="col">Measured result</th></tr></thead>
+          <thead><tr><th scope="col">Construction</th><th scope="col">Why the attack has no entry point</th><th scope="col">Countermeasure the design adds</th><th scope="col">State bits the digest withholds</th><th scope="col">Measured result</th></tr></thead>
           <tbody id="break-resist-body">
             ${b.resistance
               ? renderResistanceRows(b.resistance)
-              : '<tr><td colspan="3" class="small muted">Press the button below to run it.</td></tr>'}
+              : '<tr><td colspan="5" class="small muted">Press the button below to run it.</td></tr>'}
           </tbody>
         </table>
       </div>
       <div class="attack-buttons">
-        <button type="button" class="attack-button" id="break-run-resistant">Try the attack on SHA-3, Kupyna, Streebog and HMAC</button>
+        <button type="button" class="attack-button" id="break-run-resistant">Try the attack on SHA-3, Bash, Kupyna, Streebog and HMAC</button>
+      </div>
+      <div id="break-negative-claim">
+        ${b.resistance ? renderNegativeClaim() : ''}
       </div>
     </div>
 
@@ -1164,7 +1281,8 @@ function renderAnchorsExhibit(): string {
     'SHA-3-256': sha3_256Hex(parsed.bytes),
     SM3: sm3DigestHex(parsed.bytes),
     'Streebog-256': streebogHex(parsed.bytes, 256),
-    'Kupyna-256': kupynaHex(parsed.bytes, 256)
+    'Kupyna-256': kupynaHex(parsed.bytes, 256),
+    'Bash-256': bashHex(parsed.bytes)
   };
 
   const changedInput = mutateInput(state.anchors.input, state.anchors.mode);
@@ -1178,7 +1296,8 @@ function renderAnchorsExhibit(): string {
     'SHA-3-256': sha3_256Hex(changedParsed.bytes),
     SM3: sm3DigestHex(changedParsed.bytes),
     'Streebog-256': streebogHex(changedParsed.bytes, 256),
-    'Kupyna-256': kupynaHex(changedParsed.bytes, 256)
+    'Kupyna-256': kupynaHex(changedParsed.bytes, 256),
+    'Bash-256': bashHex(changedParsed.bytes)
   };
 
   const outputCards = Object.entries(digests)
@@ -1206,7 +1325,7 @@ function renderAnchorsExhibit(): string {
         <label for="anchors-input">Input</label>
         <textarea id="anchors-input">${escapeHtml(state.anchors.input)}</textarea>
         ${byteCount(parsed.bytes)}
-        <p class="live-note"><span class="live-dot" aria-hidden="true"></span>One input, five real digests, recomputed live: SHA-256, SHA-3-256, SM3, Streebog-256, Kupyna-256.</p>
+        <p class="live-note"><span class="live-dot" aria-hidden="true"></span>One input, six real digests, recomputed live: SHA-256, SHA-3-256, SM3, Streebog-256, Kupyna-256, Bash-256.</p>
       </div>
       <div class="panel">
         <h3>Reference summary</h3>
@@ -1214,13 +1333,13 @@ function renderAnchorsExhibit(): string {
           <li><strong>SHA-256</strong> — FIPS 180-4, ${gloss('Merkle-Damgard', 'Merkle–Damgård')}, 64 rounds, widely deployed in TLS and software signing.</li>
           <li><strong>SHA-3</strong> — FIPS 202, ${gloss('sponge')} construction over ${gloss('Keccak-f[1600]')}, 24 rounds, open competition lineage.</li>
         </ul>
-        <p class="small muted">SHA-3 is the only ${gloss('sponge')} in this lab — every other algorithm here chains blocks:</p>
+        <p class="small muted">SHA-3 and Bash are the two ${gloss('sponge', 'sponges')} in this lab — every other algorithm here chains blocks:</p>
         ${spongeDiagram()}
       </div>
     </div>
     <div class="grid-2" style="margin-top: 1rem;">${outputCards}</div>
     <div class="panel" style="margin-top: 1rem;">
-      <h3>Five-way avalanche snapshot</h3>
+      <h3>Six-way avalanche snapshot</h3>
       <p class="small muted">Modified input used for comparison: <code>${escapeHtml(changedInput)}</code> — a strong hash flips close to 50% of output bits.</p>
       <!-- role + tabindex, not just overflow-x. Below 860px .comparison-table
            takes min-width:700px, so this wrapper scrolls and holds nothing
@@ -1229,7 +1348,7 @@ function renderAnchorsExhibit(): string {
            what makes the aria-label legal: on a role-less div it would be
            prohibited and silently discarded. Note this comment is inside a
            template literal, so it must contain no backtick. -->
-      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Reference algorithm summary, scrollable">
+      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Six-way avalanche snapshot, scrollable">
         <table class="comparison-table">
           <thead><tr><th scope="col">Algorithm</th><th scope="col">Changed bits after one edit</th><th scope="col">Diffusion</th></tr></thead>
           <tbody>${avalancheRows}</tbody>
@@ -1242,7 +1361,7 @@ function renderAnchorsExhibit(): string {
 function renderDecisionExhibit(): string {
   return `
     <div class="panel">
-      <h2>Exhibit 5 — Five-Way Comparison and Decision Tree</h2>
+      <h2>Exhibit 5 — Six-Way Comparison and Decision Tree</h2>
       <!-- role + tabindex, not just overflow-x. Below 860px .comparison-table
            takes min-width:700px, so this wrapper scrolls and holds nothing
            focusable - a WCAG 2.1.1 failure that only exists at phone width, and
@@ -1250,7 +1369,7 @@ function renderDecisionExhibit(): string {
            what makes the aria-label legal: on a role-less div it would be
            prohibited and silently discarded. Note this comment is inside a
            template literal, so it must contain no backtick. -->
-      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Five-way avalanche snapshot, scrollable">
+      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Six-way comparison of hash standards, scrollable">
         <table class="comparison-table">
           <thead>
             <tr>
@@ -1258,21 +1377,22 @@ function renderDecisionExhibit(): string {
               <th scope="col">SM3</th>
               <th scope="col">Streebog-256/512</th>
               <th scope="col">Kupyna-256/512</th>
+              <th scope="col">Bash-256/384/512</th>
               <th scope="col">SHA-256</th>
               <th scope="col">SHA-3-256</th>
             </tr>
           </thead>
           <tbody>
-            <tr><th scope="row">Country</th><td>China</td><td>Russia</td><td>Ukraine</td><td>USA (NIST)</td><td>USA (NIST)</td></tr>
-            <tr><th scope="row">Year</th><td>2010</td><td>2012</td><td>2014</td><td>2001</td><td>2015</td></tr>
-            <tr><th scope="row">Output sizes</th><td>256-bit</td><td>256 / 512-bit</td><td>256 / 512-bit</td><td>256-bit</td><td>224/256/384/512</td></tr>
-            <tr><th scope="row">Construction</th><td>Merkle-Damgard</td><td>Wide-pipe MD</td><td>Wide-pipe MD (Grostl-like)</td><td>Merkle-Damgard</td><td>Sponge</td></tr>
-            <tr><th scope="row">ISO standardized</th><td>Yes</td><td>Yes</td><td>No (DSTU)</td><td>Yes</td><td>Yes</td></tr>
-            <tr><th scope="row">Design transparency</th><td>Partial</td><td>S-box opaque concern</td><td>Published</td><td>Published</td><td>Published</td></tr>
-            <tr><th scope="row">Known practical breaks</th><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td></tr>
-            <tr><th scope="row">Use when</th><td>China compliance</td><td>Russian GOST compliance</td><td>Ukrainian DSTU compliance</td><td>General use</td><td>New designs</td></tr>
+            <tr><th scope="row">Country</th><td>China</td><td>Russia</td><td>Ukraine</td><td>Belarus</td><td>USA (NIST)</td><td>USA (NIST)</td></tr>
+            <tr><th scope="row">Year</th><td>2010</td><td>2012</td><td>2014</td><td>2016</td><td>2001</td><td>2015</td></tr>
+            <tr><th scope="row">Output sizes</th><td>256-bit</td><td>256 / 512-bit</td><td>256 / 512-bit</td><td>256 / 384 / 512-bit</td><td>256-bit</td><td>224/256/384/512</td></tr>
+            <tr><th scope="row">Construction</th><td>Merkle-Damgard</td><td>Wide-pipe MD</td><td>Wide-pipe MD (Grostl-like)</td><td>Sponge (1536-bit state)</td><td>Merkle-Damgard</td><td>Sponge</td></tr>
+            <tr><th scope="row">ISO standardized</th><td>Yes</td><td>Yes</td><td>No (DSTU)</td><td>No (STB)</td><td>Yes</td><td>Yes</td></tr>
+            <tr><th scope="row">Design transparency</th><td>Partial</td><td>S-box opaque concern</td><td>Published</td><td>Published</td><td>Published</td><td>Published</td></tr>
+            <tr><th scope="row">Known practical breaks</th><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td><td>None publicly known</td></tr>
+            <tr><th scope="row">Use when</th><td>China compliance</td><td>Russian GOST compliance</td><td>Ukrainian DSTU compliance</td><td>Belarusian STB compliance</td><td>General use</td><td>New designs</td></tr>
             <tr><th scope="row">Trust level <span class="editorial-tag" title="Author's editorial judgment, not a measurement">opinion<sup>†</sup></span></th>
-              <td>Medium-High<sup>a</sup></td><td>Use with caution<sup>b</sup></td><td>High<sup>c</sup></td><td>High<sup>d</sup></td><td>High<sup>d</sup></td></tr>
+              <td>Medium-High<sup>a</sup></td><td>Use with caution<sup>b</sup></td><td>High<sup>c</sup></td><td>Medium<sup>e</sup></td><td>High<sup>d</sup></td><td>High<sup>d</sup></td></tr>
           </tbody>
         </table>
       </div>
@@ -1288,8 +1408,9 @@ function renderDecisionExhibit(): string {
           <li><sup>b</sup> <strong>Streebog — Use with caution.</strong> Perrin (2019) showed the shared Kuznyechik ${gloss('S-box')} has hidden structure inconsistent with random generation. No break follows from it, but unexplained structure in an opaque component is a design-trust red flag outside a compliance mandate.</li>
           <li><sup>c</sup> <strong>Kupyna — High.</strong> Public design, wide-pipe construction with an output transformation (no length-extension), no known practical weakness. Lower ecosystem/tooling maturity than SHA-2/3 is a practical, not a trust, caveat.</li>
           <li><sup>d</sup> <strong>SHA-256 / SHA-3 — High.</strong> Decades (SHA-256) or an open public competition (SHA-3) of scrutiny, fully published design, ubiquitous tooling.</li>
+          <li><sup>e</sup> <strong>Bash — Medium.</strong> Published design with an academic lineage (Agievich et al., BSU) and a ${gloss('sponge')} construction that inherits the structural argument SHA-3 rests on. Marked down for thin third-party cryptanalysis and, very concretely, for ecosystem immaturity: the npm implementation this lab started from miscomputes the sponge rate and fails 7 of the 11 vectors in the standard's own Annex A, which is why this lab implements the sponge itself. That is a tooling risk, not a design one — but it is the risk you actually take reaching for it.</li>
         </ul>
-        <p class="small muted">Sources: L. Perrin, "Partitions in the S-Box of Streebog and Kuznyechik" (ToSC 2019); FIPS 180-4; FIPS 202; GM/T 0004-2012; DSTU 7564:2014.</p>
+        <p class="small muted">Sources: L. Perrin, "Partitions in the S-Box of Streebog and Kuznyechik" (ToSC 2019); FIPS 180-4; FIPS 202; GM/T 0004-2012; DSTU 7564:2014; STB 34.101.77-2020.</p>
       </details>
     </div>
     <div class="grid-2" style="margin-top: 1rem;">
@@ -1300,6 +1421,7 @@ function renderDecisionExhibit(): string {
           <li>I am operating under Chinese Cryptography Law or Chinese PKI → SM3.</li>
           <li>I need Russian GOST R 34.11-2012 compliance → Streebog (with S-box caveat).</li>
           <li>I need Ukrainian DSTU 7564:2014 compliance → Kupyna.</li>
+          <li>I need Belarusian STB 34.101.77 compliance → Bash.</li>
           <li>I am building a new protocol without compliance constraints → SHA-3 or BLAKE3.</li>
         </ol>
       </div>
@@ -1398,13 +1520,13 @@ function render(): void {
         <button class="theme-toggle" id="theme-toggle" aria-label="${toggleLabel}" title="${toggleLabel}">${toggleEmoji}</button>
         <div class="cl-hero-main">
           <h1 class="cl-hero-title">World Hashes</h1>
-          <p class="cl-hero-sub">SM3 · Streebog · Kupyna · SHA-256 · SHA-3</p>
+          <p class="cl-hero-sub">SM3 · Streebog · Kupyna · Bash · SHA-256 · SHA-3</p>
           <p class="cl-hero-desc">
-            Hash the same input with three national standards and the SHA anchors side by side, and watch the avalanche effect flip half the output bits from a one-bit change.
+            Hash the same input with four national standards and the SHA anchors side by side, and watch the avalanche effect flip half the output bits from a one-bit change.
           </p>
           <div class="hero-badges">
             <span class="badge">National Hash Standards</span>
-            <span class="badge">SM3 · Streebog · Kupyna</span>
+            <span class="badge">SM3 · Streebog · Kupyna · Bash</span>
             <span class="badge">SHA-256 · SHA-3 Reference</span>
             ${verificationBadge()}
           </div>
@@ -1412,14 +1534,14 @@ function render(): void {
         <aside class="cl-hero-why" aria-label="Why it matters">
           <span class="cl-hero-why-label">WHY IT MATTERS</span>
           <p class="cl-hero-why-text">
-            SHA-256 and SHA-3 dominate globally, yet China, Russia, and Ukraine mandate their own hashes for regulated systems. Knowing them is what lets you build, audit, or interoperate across sovereign compliance regimes.
+            SHA-256 and SHA-3 dominate globally, yet China, Russia, Ukraine, and Belarus mandate their own hashes for regulated systems. Knowing them is what lets you build, audit, or interoperate across sovereign compliance regimes.
           </p>
         </aside>
       </header>
 
       ${renderIntroExhibit()}
 
-      <p class="section-lead small muted">Now compare how five real standards do it. Each exhibit hashes the same bytes and shows the avalanche effect — a good hash turns a tiny input change into a totally different digest.</p>
+      <p class="section-lead small muted">Now compare how six real standards do it. Each exhibit hashes the same bytes and shows the avalanche effect — a good hash turns a tiny input change into a totally different digest.</p>
 
       <nav class="tabs" role="tablist" aria-label="Exhibit tabs">
         ${tabButtons}
