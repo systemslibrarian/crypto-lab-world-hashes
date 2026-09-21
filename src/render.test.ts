@@ -52,6 +52,18 @@ describe('known-answer verification panel', () => {
   });
 });
 
+describe('Bash is presented as a sponge, alongside SHA-3 rather than instead of it', () => {
+  it('names both sponges in the anchors exhibit and hashes Bash live', () => {
+    document.querySelector<HTMLButtonElement>('[data-tab-target="anchors"]')?.click();
+    const panel = document.getElementById('panel-anchors');
+    expect(panel?.textContent).toContain('Bash-256');
+    // The claim this replaced ("SHA-3 is the only sponge in this lab") stopped
+    // being true the moment Bash landed.
+    expect(panel?.textContent).toContain('SHA-3 and Bash are the two');
+    expect(panel?.textContent).not.toContain('only sponge');
+  });
+});
+
 describe('Kupyna construction accuracy', () => {
   it('identifies Kupyna as wide-pipe Merkle–Damgård rather than a sponge', () => {
     const kupynaTab = document.querySelector<HTMLButtonElement>('[data-tab-target="kupyna"]');
@@ -107,13 +119,49 @@ describe('the Break-it attack lab renders only computed verdicts', () => {
   it('shows the resistant constructions holding, each from a real attempt', () => {
     document.querySelector<HTMLButtonElement>('#break-run-resistant')?.click();
     const rows = document.querySelectorAll('[data-resist-row]');
-    expect(rows).toHaveLength(4);
+    // Five since Bash joined SHA-3, Kupyna, Streebog and HMAC (was four).
+    expect(rows).toHaveLength(5);
     for (const row of rows) {
       expect(row.querySelector('[data-resist-outcome]')?.getAttribute('data-resist-outcome')).toBe('held');
     }
     const body = document.getElementById('break-resist-body');
     expect(body?.querySelector('[data-resist-row="kupyna256"]')?.textContent).toContain('Wide-pipe');
     expect(body?.querySelector('[data-resist-row="sha3-256"]')?.textContent).toContain('Sponge');
+    expect(body?.querySelector('[data-resist-row="bash256"]')?.textContent).toContain('Sponge');
+  });
+
+  it('presents Bash as needing no countermeasure, not as defending itself', () => {
+    const bash = document.querySelector('[data-resist-row="bash256"]');
+    // The honesty rule this guards: Bash must never be shown carrying an
+    // MD-style defence it does not have.
+    expect(bash?.querySelector('[data-countermeasure]')?.getAttribute('data-countermeasure')).toBe(
+      'none',
+    );
+    // …while the two constructions that DO add a mechanism are marked as such,
+    // so "none" is a distinction the table can actually draw.
+    for (const id of ['kupyna256', 'streebog256']) {
+      expect(
+        document
+          .querySelector(`[data-resist-row="${id}"] [data-countermeasure]`)
+          ?.getAttribute('data-countermeasure'),
+      ).toBe('added');
+    }
+  });
+
+  it('backs the negative claim with computed bit counts, not prose', () => {
+    const claim = document.querySelector('[data-negative-claim]');
+    expect(claim?.getAttribute('data-negative-claim')).toBe('no-countermeasure');
+
+    // Re-derive the withheld-bits figures from the geometry the page prints,
+    // rather than trusting the sentence around them.
+    const read = (id: string): number =>
+      Number.parseInt(document.getElementById(id)?.textContent?.trim() ?? '', 10);
+    expect(read('claim-immune-withheld')).toBe(read('claim-immune-state') - 256);
+    expect(read('claim-forgeable-withheld')).toBe(read('claim-forgeable-state') - 256);
+    // Bash withholds most of its state; SHA-256 withholds none, which is the
+    // whole reason one is forged above and the other cannot be entered.
+    expect(read('claim-immune-withheld')).toBe(1280);
+    expect(read('claim-forgeable-withheld')).toBe(0);
   });
 
   it('finds a verified truncated collision and refuses to claim one on a starved budget', () => {

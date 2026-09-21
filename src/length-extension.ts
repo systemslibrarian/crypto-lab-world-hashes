@@ -2,9 +2,10 @@
  * length-extension.ts — a REAL length-extension attack, executed in the browser.
  *
  * The rest of this lab teaches that SM3 and SHA-256 hand out their final
- * chaining state as the digest, while SHA-3 (sponge), Kupyna (wide-pipe) and
- * Streebog (checksum + length finalization) do not. That claim is worth
- * something only if you can watch it break something. This module lets you.
+ * chaining state as the digest, while SHA-3 and Bash (sponges), Kupyna
+ * (wide-pipe) and Streebog (checksum + length finalization) do not. That claim
+ * is worth something only if you can watch it break something. This module lets
+ * you.
  *
  * THE SCENARIO
  * ------------
@@ -360,13 +361,111 @@ export function attemptLengthExtension(
 
 /* ------------------------------------------------- the constructions that resist */
 
-export type ResistantAlgorithm = 'sha3-256' | 'kupyna256' | 'streebog256';
+export type ResistantAlgorithm = 'sha3-256' | 'kupyna256' | 'streebog256' | 'bash256';
+
+export type ComparedAlgorithm = ExtendableAlgorithm | ResistantAlgorithm | 'hmac-sha256';
+
+/**
+ * Where each construction keeps its state, and what — if anything — its design
+ * ADDS to stop length extension.
+ *
+ * This table exists so the exhibit can stop arguing and start measuring. The
+ * attack works when the published digest IS the whole chaining state, and fails
+ * when it is not; `unexposedStateBits()` is that gap, in bits. A narrow-pipe
+ * Merkle–Damgård hash withholds nothing (0 bits) and falls. A sponge withholds
+ * most of its state and cannot be entered at all.
+ *
+ * `countermeasure: null` means the design adds NOTHING against length extension
+ * — no length encoding, no checksum, no output transformation. It is the same
+ * value for SHA-256, which is forged on this page, and for Bash and SHA-3,
+ * which cannot be touched. That coincidence is the lesson: the defence is not a
+ * bolt-on, it is whether the digest is the state.
+ */
+export interface Construction {
+  label: string;
+  /** The construction family, in the words the rest of the lab uses. */
+  family: string;
+  /** Size of the internal chaining/sponge state, in bits. */
+  stateBits: number;
+  /** Size of the published digest, in bits. */
+  digestBits: number;
+  /** What the design adds to block length extension; null when it adds nothing. */
+  countermeasure: string | null;
+}
+
+export const CONSTRUCTIONS: Record<ComparedAlgorithm, Construction> = {
+  sha256: {
+    label: 'SHA-256',
+    family: 'Narrow-pipe Merkle–Damgård',
+    stateBits: 256,
+    digestBits: 256,
+    countermeasure: null,
+  },
+  sm3: {
+    label: 'SM3',
+    family: 'Narrow-pipe Merkle–Damgård',
+    stateBits: 256,
+    digestBits: 256,
+    countermeasure: null,
+  },
+  'sha3-256': {
+    label: 'SHA-3-256',
+    family: 'Sponge',
+    stateBits: 1600,
+    digestBits: 256,
+    countermeasure: null,
+  },
+  bash256: {
+    label: 'Bash-256',
+    family: 'Sponge',
+    stateBits: 1536,
+    digestBits: 256,
+    countermeasure: null,
+  },
+  kupyna256: {
+    label: 'Kupyna-256',
+    family: 'Wide-pipe Merkle–Damgård',
+    stateBits: 512,
+    digestBits: 256,
+    countermeasure: 'output transformation Ω truncates the wide state',
+  },
+  streebog256: {
+    label: 'Streebog-256',
+    family: 'Merkle–Damgård + finalization',
+    stateBits: 512,
+    digestBits: 256,
+    countermeasure: 'finalization folds in the total length N and the block checksum Σ',
+  },
+  'hmac-sha256': {
+    label: 'HMAC-SHA-256',
+    family: 'Nested hash (the fix, not a different hash)',
+    stateBits: 256,
+    digestBits: 256,
+    countermeasure: 'the published tag is an OUTER hash the attacker cannot extend',
+  },
+};
+
+/**
+ * Bits of internal state a published digest does NOT reveal — computed from the
+ * geometry above rather than stated, so a claim about it cannot drift from it.
+ *
+ * 0 means the digest is the entire state, which is exactly the precondition
+ * `forgeFromTag` needs.
+ */
+export function unexposedStateBits(algorithm: ComparedAlgorithm): number {
+  const construction = CONSTRUCTIONS[algorithm];
+  return construction.stateBits - construction.digestBits;
+}
 
 export interface ResistanceResult {
   algorithm: ResistantAlgorithm | 'hmac-sha256';
   label: string;
   /** Why the attack cannot even be assembled for this construction. */
   reason: string;
+  /** The measured state/digest geometry, carried so the UI never restates it. */
+  construction: Construction;
+  /** Computed: bits of state the digest withholds. */
+  unexposedStateBits: number;
   /**
    * The closest computable analogue of the attack — treat the digest as if it
    * were a resumable state and continue from it — and its measured result.
@@ -453,6 +552,14 @@ export function checkResistance(
         'Sponge. The 1600-bit state is squeezed down to 256 bits of output, so the digest is not ' +
         'the state — there is nothing to load and continue from.',
     },
+    bash256: {
+      label: 'Bash-256',
+      reason:
+        'Sponge, like SHA-3 and unlike every other national hash here. The message is absorbed ' +
+        'into a 1536-bit state whose capacity it never touches, and only 256 bits are read back ' +
+        'out — so the digest is not the state, and the attack has nothing to load. Bash adds no ' +
+        'length-extension countermeasure because the construction leaves nothing to counter.',
+    },
     kupyna256: {
       label: 'Kupyna-256',
       reason:
@@ -478,9 +585,65 @@ export function checkResistance(
     algorithm,
     label: REASONS[algorithm].label,
     reason: REASONS[algorithm].reason,
+    construction: CONSTRUCTIONS[algorithm],
+    unexposedStateBits: unexposedStateBits(algorithm),
     naiveForgery,
     serverTag,
     forged: naiveForgery === serverTag,
+  };
+}
+
+/* --------------------------------------------------- the negative claim (§4.1d) */
+
+export interface UndefendedConstruction extends Construction {
+  /** Computed from the geometry: bits of state the digest withholds. */
+  unexposedStateBits: number;
+}
+
+export interface NoDefenceEvidence {
+  /** A construction that adds no countermeasure and does not need one. */
+  immune: UndefendedConstruction;
+  /** A construction that adds no countermeasure either — and is forged on this page. */
+  forgeable: UndefendedConstruction;
+  /**
+   * Computed, not asserted: both really do declare `countermeasure: null`.
+   * If either ever gained one, the claim below would stop being true and this
+   * flag — and the test that reads it — would say so.
+   */
+  bothUndefended: boolean;
+}
+
+/**
+ * The evidence behind this lab's negative claim.
+ *
+ * The claim: **Bash carries no length-extension countermeasure at all.** No
+ * length encoding, no checksum, no output transformation — nothing. Neither
+ * does SHA-256, and SHA-256 is forged on this page. So the absence of a defence
+ * is not what saves Bash, and a page that dressed the sponge up as "defending
+ * itself" would be teaching the opposite of the lesson.
+ *
+ * What separates them is measured here rather than argued: how many bits of
+ * internal state the published digest withholds. SHA-256 withholds none — the
+ * digest IS the state, which is precisely the precondition `forgeFromTag()`
+ * needs. Bash withholds 1280 of 1536. There is no countermeasure on either
+ * side; there is only a construction that hands out its state and one that
+ * does not.
+ *
+ * And the thing the absence does NOT buy: authentication. A green row for Bash
+ * means this attack has no entry point, not that `tag = bash256(secret ‖ msg)`
+ * is a sound MAC. HMAC is still the portable answer.
+ */
+export function noDefenceEvidence(): NoDefenceEvidence {
+  const describe = (algorithm: ComparedAlgorithm): UndefendedConstruction => ({
+    ...CONSTRUCTIONS[algorithm],
+    unexposedStateBits: unexposedStateBits(algorithm),
+  });
+  const immune = describe('bash256');
+  const forgeable = describe('sha256');
+  return {
+    immune,
+    forgeable,
+    bothUndefended: immune.countermeasure === null && forgeable.countermeasure === null,
   };
 }
 

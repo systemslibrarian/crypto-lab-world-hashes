@@ -77,12 +77,14 @@ test('a wrong secret-length guess makes the forgery fail, and the page says why'
   await expect(result).toHaveAttribute('data-attack-result', 'forged', { timeout: 30_000 });
 });
 
-test('SHA-3, Kupyna, Streebog and HMAC all hold against the same attempt', async ({ page }) => {
+test('SHA-3, Bash, Kupyna, Streebog and HMAC all hold against the same attempt', async ({
+  page,
+}) => {
   await page.locator('#break-run-resistant').click();
 
   const rows = page.locator('[data-resist-row]');
-  await expect(rows).toHaveCount(4);
-  for (const id of ['sha3-256', 'kupyna256', 'streebog256', 'hmac-sha256']) {
+  await expect(rows).toHaveCount(5);
+  for (const id of ['sha3-256', 'bash256', 'kupyna256', 'streebog256', 'hmac-sha256']) {
     const row = page.locator(`[data-resist-row="${id}"]`);
     await expect(row.locator('[data-resist-outcome]')).toHaveAttribute(
       'data-resist-outcome',
@@ -95,7 +97,41 @@ test('SHA-3, Kupyna, Streebog and HMAC all hold against the same attempt', async
     'Wide-pipe Merkle–Damgård',
   );
   await expect(page.locator('[data-resist-row="sha3-256"]')).toContainText('Sponge');
+  await expect(page.locator('[data-resist-row="bash256"]')).toContainText('Sponge');
   await expect(page.locator('[data-resist-row="streebog256"]')).toContainText('checksum');
+});
+
+test('Bash holds as a sponge, without being credited with a defence it has not got', async ({
+  page,
+}) => {
+  await page.locator('#break-run-resistant').click();
+
+  // Bash resists, and the table says it adds NOTHING to achieve that — the same
+  // "none" SHA-256 has while being forged in the panel above. Showing Bash with
+  // an MD-style countermeasure would be the regression this guards.
+  const bash = page.locator('[data-resist-row="bash256"]');
+  await expect(bash.locator('[data-resist-outcome]')).toHaveAttribute(
+    'data-resist-outcome',
+    'held',
+  );
+  await expect(bash.locator('[data-countermeasure]')).toHaveAttribute(
+    'data-countermeasure',
+    'none',
+  );
+  // …and the distinction is a real one: the two constructions that do add a
+  // mechanism are marked differently.
+  for (const id of ['kupyna256', 'streebog256']) {
+    await expect(page.locator(`[data-resist-row="${id}"] [data-countermeasure]`)).toHaveAttribute(
+      'data-countermeasure',
+      'added',
+    );
+  }
+
+  // What holds it is the withheld state, reported as a measurement: 1536 − 256.
+  const withheld = Number(
+    (await bash.locator('[data-withheld-bits]').getAttribute('data-withheld-bits')) ?? '0',
+  );
+  expect(withheld).toBe(1280);
 });
 
 test('the truncated-collision search finds a verified collision', async ({ page }) => {

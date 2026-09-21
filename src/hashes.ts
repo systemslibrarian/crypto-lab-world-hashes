@@ -4,6 +4,8 @@ import { sha256, sha512 } from '@noble/hashes/sha2.js';
 import { sha3_256, sha3_512 } from '@noble/hashes/sha3.js';
 import { sm3 as sm3Hash } from 'sm-crypto';
 
+import { bash256 } from './bash';
+
 /**
  * Single source of truth for every hash function in the demo.
  *
@@ -20,7 +22,8 @@ export type AlgorithmId =
   | 'streebog256'
   | 'streebog512'
   | 'kupyna256'
-  | 'kupyna512';
+  | 'kupyna512'
+  | 'bash256';
 
 export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
@@ -35,7 +38,11 @@ const IMPLEMENTATIONS: Record<AlgorithmId, (bytes: Uint8Array) => string> = {
   streebog256: (bytes) => bytesToHex(streebog256(bytes)),
   streebog512: (bytes) => bytesToHex(streebog512(bytes)),
   kupyna256: (bytes) => bytesToHex(kupyna256(bytes)),
-  kupyna512: (bytes) => bytesToHex(kupyna512(bytes))
+  kupyna512: (bytes) => bytesToHex(kupyna512(bytes)),
+  // Bash is the one algorithm here whose sponge is implemented in this repo
+  // rather than imported: `@li0ard/bash`'s wrapper gets the rate wrong and
+  // fails 7 of the 11 published vectors. See the header of ./bash.ts.
+  bash256: (bytes) => bytesToHex(bash256(bytes))
 };
 
 /** Human-readable labels, used in headings and result cards. */
@@ -48,7 +55,8 @@ export const ALGORITHM_LABELS: Record<AlgorithmId, string> = {
   streebog256: 'Streebog-256',
   streebog512: 'Streebog-512',
   kupyna256: 'Kupyna-256',
-  kupyna512: 'Kupyna-512'
+  kupyna512: 'Kupyna-512',
+  bash256: 'Bash-256'
 };
 
 /** Digest length in bits, used to report avalanche statistics. */
@@ -61,7 +69,8 @@ export const ALGORITHM_BITS: Record<AlgorithmId, number> = {
   streebog256: 256,
   streebog512: 512,
   kupyna256: 256,
-  kupyna512: 512
+  kupyna512: 512,
+  bash256: 256
 };
 
 export function computeHex(algorithm: AlgorithmId, bytes: Uint8Array): string {
@@ -108,7 +117,12 @@ export const TEST_VECTORS: TestVector[] = [
   // Kupyna — DSTU 7564:2014
   { algorithm: 'kupyna256', input: '', inputLabel: 'empty string', expected: 'cd5101d1ccdf0d1d1f4ada56e888cd724ca1a0838a3521e7131d4fb78d0f5eb6', source: 'DSTU 7564:2014' },
   { algorithm: 'kupyna256', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: '996899f2d7422ceaf552475036b2dc120607eff538abf2b8dff471a98a4740c6', source: 'widely published reference value (not a DSTU 7564:2014 vector)' },
-  { algorithm: 'kupyna512', input: '', inputLabel: 'empty string', expected: '656b2f4cd71462388b64a37043ea55dbe445d452aecd46c3298343314ef04019bcfa3f04265a9857f91be91fce197096187ceda78c9c1c021c294a0689198538', source: 'DSTU 7564:2014' }
+  { algorithm: 'kupyna512', input: '', inputLabel: 'empty string', expected: '656b2f4cd71462388b64a37043ea55dbe445d452aecd46c3298343314ef04019bcfa3f04265a9857f91be91fce197096187ceda78c9c1c021c294a0689198538', source: 'DSTU 7564:2014' },
+  // Bash — STB 34.101.77. A.3.1 is the one Annex A vector whose input is the
+  // empty message and so is expressible as the UTF-8 text this table shows;
+  // the other ten hash the Belarusian binary test string and are checked in
+  // src/bash.test.ts, where they span the sponge's rate boundary.
+  { algorithm: 'bash256', input: '', inputLabel: 'empty string', expected: '114c3dfae373d9bcbc3602d6386f2d6a2059ba1bf9048dbaa5146a6cb775709d', source: 'STB 34.101.77 §A.3.1' }
 ];
 
 export interface SelfTestResult {
