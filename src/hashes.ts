@@ -130,11 +130,12 @@ export const TEST_VECTORS: TestVector[] = [
   // the other ten hash the Belarusian binary test string and are checked in
   // src/bash.test.ts, where they span the sponge's rate boundary.
   { algorithm: 'bash256', input: '', inputLabel: 'empty string', expected: '114c3dfae373d9bcbc3602d6386f2d6a2059ba1bf9048dbaa5146a6cb775709d', source: 'STB 34.101.77 §A.3.1' },
-  // LSH — KS X 3262. The "abc" digest is the published LSH reference value and
-  // is not derived from the Crypto++ data the rest of src/lsh.ts checks
-  // against, so the two sources corroborate rather than repeat each other.
-  // KS X 3262 itself was not consulted directly; the label says so.
-  { algorithm: 'lsh256', input: 'abc', inputLabel: '"abc"', expected: '5fbf365daea5446a7053c52b57404d77a07a5f48a1f7c1963a0898ba1b714741', source: 'published LSH reference value (KS X 3262 not consulted directly)' }
+  // LSH — KS X 3262. This digest is the one published in Wikipedia's
+  // "LSH (hash function)" article, which is not derived from the Crypto++ data
+  // that src/lsh.ts also checks against. KS X 3262 itself was not consulted —
+  // it is not freely available — and the label says so rather than citing a
+  // clause this lab has never read.
+  { algorithm: 'lsh256', input: 'abc', inputLabel: '"abc"', expected: '5fbf365daea5446a7053c52b57404d77a07a5f48a1f7c1963a0898ba1b714741', source: 'Wikipedia "LSH (hash function)" reference digest (KS X 3262 not consulted directly)' }
 ];
 
 export interface SelfTestResult {
