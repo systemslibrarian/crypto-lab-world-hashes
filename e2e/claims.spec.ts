@@ -110,6 +110,12 @@ test('LSH is hashed live, and its hand-rolled maths is pinned to two sources', a
   await expect(panel).toContainText('no npm implementation at all');
   await expect(panel).toContainText('they are not worth the same', { ignoreCase: true });
   await expect(panel).toContainText('a document this lab has not read');
+  // The independent source is pinned to an exact commit, not just a repo name,
+  // so the citation survives upstream moving or rewriting history.
+  const pin = page.locator('#lsh-source-pin');
+  await expect(pin).toBeVisible();
+  await expect(pin).toContainText('testcases_{224,256}_test.go');
+  await expect(pin).toContainText(/\b[0-9a-f]{7,40}\b/);
   await expect(panel).not.toContainText('corroborate rather than repeat each other');
 
   // And the digest really is computed in the browser.

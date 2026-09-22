@@ -397,9 +397,11 @@ function verificationPanel(): string {
         lab writes it from the specification, which makes transcription the risk rather than a third
         party's bug. Its vectors come from two places, and they are <em>not</em> worth the same.
         <strong>Independent</strong> ones were published by someone other than the implementation
-        these constants were transcribed from: Korea's own algorithm-validation vectors and the
-        <code>"abc"</code> reference digest from Wikipedia. They cover the empty message, exactly one
-        block, and past one block, for both widths. The rest are Crypto++'s own test data, whose file
+        these constants were transcribed from: Korea's own algorithm-validation vectors
+        (<span id="lsh-source-pin">go-krypto <code>lsh256/testcases_{224,256}_test.go</code> @
+        <code>478a2e9</code></span>, pinned by commit and blob hash so the citation stays checkable
+        after the repository moves) and the <code>"abc"</code> reference digest from Wikipedia. They
+        cover the empty message, exactly one block, and past one block, for both widths. The rest are Crypto++'s own test data, whose file
         header records that Crypto++ <em>generated</em> them — so they show this lab and Crypto++
         agree, which is not the same as showing either matches KS X 3262, a document this lab has not
         read. Hence two numbers rather than one:
