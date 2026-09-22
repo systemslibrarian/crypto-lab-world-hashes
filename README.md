@@ -12,7 +12,7 @@ The page opens with a **ground-floor "what is a cryptographic hash?" panel** tha
 - Streebog-256/512: Required for Russian GOST R 34.11-2012 compliance — pairs with GOST elliptic curve signatures.
 - Kupyna-256/512: Required for Ukrainian DSTU 7564:2014 compliance.
 - Bash-256/384/512: Required for Belarusian STB 34.101.77 compliance.
-- LSH-256/512: Required for Korean KS X 3262 compliance.
+- LSH-256-224/256: Required for Korean KS X 3262 compliance (the LSH-512 family is out of scope here).
 - SHA-256: General-purpose default for all other use cases.
 - SHA-3: Preferred for new protocol designs or when sponge security matters.
 - Do not use Streebog outside Russian compliance requirements — shared S-box transparency concerns with Kuznyechik apply.
@@ -46,7 +46,7 @@ All hash outputs are real — no simulation. Every digest is produced in your br
 - Using a narrow-pipe Merkle–Damgård hash (SM3, SHA-256) directly as a MAC is vulnerable to length-extension; wrap it in HMAC instead. Exhibit 5 runs that forgery live rather than describing it. The others avoid it for different reasons — Streebog through its length/checksum finalization, Kupyna and LSH through a wide state folded down before output, SHA-3 and Bash because a sponge never hands out its state at all — but HMAC remains the portable choice, and length-extension immunity is not on its own MAC security.
 - Streebog and Kuznyechik share S-box transparency concerns, so deploying Streebog outside its compliance mandate inherits an unresolved design-trust question.
 - Bash's risk today is ecosystem, not design: the npm implementation this lab started from fails 7 of the 11 vectors in the standard's own Annex A, and does so *silently* — it agrees with the standard on anything shorter than one sponge block. A conformance suite that only tests short messages will not catch it. Test against Annex A across a rate boundary before trusting any Bash implementation.
-- LSH has the same shape of risk, one step further along: there is no JavaScript implementation of it at all (every npm package named `lsh` is locality-sensitive hashing, an unrelated technique), so this lab transcribes it from the specification. That makes *transcription* the failure mode rather than someone else's bug, which is why [`src/lsh.ts`](src/lsh.ts) is pinned against two independent sources and checks itself on every page load.
+- LSH has the same shape of risk, one step further along: there is no JavaScript implementation of it at all (every npm package named `lsh` is locality-sensitive hashing, an unrelated technique), so this lab transcribes it from the specification. That makes *transcription* the failure mode rather than someone else's bug. [`src/lsh.ts`](src/lsh.ts) therefore separates its vectors by provenance and reports them as two numbers, not one: **independent** digests published by someone other than the implementation it was transcribed from (Korea's algorithm-validation vectors — read from [`RyuaNerin/go-krypto`](https://github.com/RyuaNerin/go-krypto) `lsh256/testcases_{224,256}_test.go` at commit `478a2e9a667e15f6fa42bc4457cf7e2e5798d6b7`, pinned by blob hash in [`src/lsh.ts`](src/lsh.ts) so the citation stays checkable after the repo moves — and the `"abc"` digest from Wikipedia), covering the empty message, exactly one block and past one block for both widths; and **cross-implementation** digests from Crypto++, whose own file header records that Crypto++ generated them. The second kind shows this lab and Crypto++ agree — not that either matches KS X 3262, which this lab has not read.
 - Reaching for a national hash outside its regulatory requirement trades SHA-2/SHA-3 scrutiny and tooling for weaker ecosystem support with no security gain.
 - Collision and second-preimage resistance are assumptions, not guarantees; truncating a digest or misusing it for password storage (no salt/KDF) undermines the intended security.
 - Mismatched variants (e.g. confusing the 256-bit and 512-bit outputs, or differing byte/endianness conventions between standards) break interoperability between implementations.
@@ -57,7 +57,7 @@ All hash outputs are real — no simulation. Every digest is produced in your br
 - Streebog-256/512 is mandated for Russian GOST R 34.11-2012 compliance, paired with GOST elliptic-curve signatures.
 - Kupyna-256/512 is required for Ukrainian DSTU 7564:2014 compliance.
 - Bash-256/384/512 (STB 34.101.77) is Belarus's national hash, designed at the Research Institute for Applied Problems of Mathematics and Informatics, BSU, and used alongside the belt block cipher (STB 34.101.31) and bign signatures (STB 34.101.45).
-- LSH-256/512 (KS X 3262) is South Korea's national hash, designed by Kim, Hong, Lee, Kim and Kwon and published by KISA for general-purpose software integrity.
+- LSH-256-224/256 (KS X 3262) is South Korea's national hash, designed by Kim, Hong, Lee, Kim and Kwon and published by KISA for general-purpose software integrity. This lab implements the 32-bit LSH-256 family only; the 64-bit LSH-512 family is a separate construction and is not included.
 - SHA-256 (FIPS 180-4) remains the general-purpose default across the internet, with SHA-3 (FIPS 202) preferred for new sponge-based designs.
 
 ## How to Run Locally
@@ -88,7 +88,7 @@ The hero shows a live self-test badge (e.g. `✓ 19/19 test vectors verified`). 
 | Streebog-256 / -512 | GOST R 34.11-2012 | empty, fox |
 | Kupyna-256 / -512 | DSTU 7564:2014 | empty, fox |
 | Bash-256 | STB 34.101.77 §A.3.1 | empty |
-| LSH-256 | published LSH reference value | `"abc"` |
+| LSH-256 | Wikipedia "LSH (hash function)" reference digest — KS X 3262 not consulted | `"abc"` |
 
 The same vectors run in CI via [Vitest](https://vitest.dev/) on every push, alongside a happy-dom render test that asserts the UI mounts and reports all vectors passing, and an [axe-core](https://github.com/dequelabs/axe-core) accessibility scan.
 
