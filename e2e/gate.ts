@@ -591,13 +591,38 @@ export async function scan(page: Page, label: string): Promise<void> {
   }));
   softExpect(violations, `axe violations in state: ${label}`, []);
 
+  // `label-content-name-mismatch` on the flip strip, and ONLY there. axe
+  // cannot decide this rule for a control whose visible text is a single
+  // character, so it files every flip cell under `incomplete` no matter what
+  // the name says. That was measured rather than assumed: with the cell's
+  // visible text lengthened by two characters and the name lengthened to
+  // match, the same page passes; reverting the two characters brings the
+  // incomplete results straight back. The cells show one character each
+  // because that IS the exhibit -- you click a character to flip it.
+  //
+  // This narrows nothing else. The rule still fails the gate anywhere outside
+  // `[data-flip-index]`, and it is excused here only in axe's "could not
+  // decide" bucket, never in `violations`. Each cell's name does contain its
+  // character: a cell reading "S" is named "S: flip character 1".
   const unexplainedIncomplete = results.incomplete
     .filter((v) => v.id !== 'color-contrast')
     .map((v) => ({
       state: label,
       id: v.id,
-      nodes: v.nodes.map((n) => n.target.join(' ')).slice(0, 8),
-    }));
+      // Drop the flip cells from this one rule, and nothing else: any other
+      // node under the same rule still fails the gate.
+      nodes: v.nodes
+        .map((n) => n.target.join(' '))
+        .filter(
+          (t) =>
+            !(
+              v.id === 'label-content-name-mismatch' &&
+              (t.includes('[data-flip-index=') || t.includes('.flip-cell'))
+            ),
+        ),
+    }))
+    .filter((v) => v.nodes.length > 0)
+    .map((v) => ({ ...v, nodes: v.nodes.slice(0, 8) }));
   softExpect(unexplainedIncomplete, `axe incomplete results in state: ${label}`, []);
 
   const contrast = Array.from(new Set(formatContrastFailures(await auditContrast(page))));

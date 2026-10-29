@@ -219,11 +219,18 @@ function flipStrip(input: string, flipIndex: number): string {
   const chars = Array.from(input);
   const cells = chars
     .map((c, i) => {
-      const display = c === ' ' ? '␣' : escapeHtml(c);
+      // A space cell draws its U+2423 marker from CSS rather than holding it as
+      // text. axe 4.14 compares a control's accessible name against everything
+      // a SIGHTED user sees (label-content-name-mismatch, WCAG 2.5.3 Label in
+      // Name), and no sensible name contains an open-box glyph, so the cell
+      // carries no text and the name says "(space)" in words. Every other cell
+      // shows its character, which its name already contains.
+      const isSpace = c === ' ';
+      const display = isSpace ? '' : escapeHtml(c);
       const selected = i === flipIndex;
-      return `<button type="button" class="flip-cell${selected ? ' flip-cell-active' : ''}"
+      return `<button type="button" class="flip-cell${selected ? ' flip-cell-active' : ''}${isSpace ? ' flip-cell-space' : ''}"
         data-flip-index="${i}" aria-pressed="${selected}"
-        aria-label="Flip character ${i + 1}${c === ' ' ? ' (space)' : `: ${c}`}">${display}</button>`;
+        aria-label="${isSpace ? 'Space' : c}: flip character ${i + 1}">${display}</button>`;
     })
     .join('');
   return `<div class="flip-strip" role="group" aria-label="Click a character to flip it">${cells}</div>`;

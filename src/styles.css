@@ -913,3 +913,6 @@ textarea {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The space marker on a flip cell, drawn here rather than held as text. */
+.flip-cell-space::before { content: "\2423"; }
