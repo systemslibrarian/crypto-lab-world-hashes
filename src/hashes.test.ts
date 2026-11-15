@@ -16,6 +16,30 @@ describe('known-answer test vectors', () => {
     expect([...covered].sort()).toEqual(Object.keys(ALGORITHM_LABELS).sort());
   });
 
+  it('holds the 19 vectors the badge counts, algorithm by algorithm', () => {
+    // The README's table and the hero badge both describe this list, so the
+    // per-algorithm split is pinned here: a vector added to one algorithm has
+    // to be added to that table row too, and the badge follows the length.
+    const perAlgorithm: Record<string, number> = {};
+    for (const vector of TEST_VECTORS) {
+      perAlgorithm[vector.algorithm] = (perAlgorithm[vector.algorithm] ?? 0) + 1;
+    }
+    expect(perAlgorithm).toEqual({
+      sm3: 2,
+      sha256: 3,
+      sha512: 2,
+      'sha3-256': 2,
+      'sha3-512': 1,
+      streebog256: 2,
+      streebog512: 2,
+      kupyna256: 2,
+      kupyna512: 1,
+      bash256: 1,
+      lsh256: 1
+    });
+    expect(TEST_VECTORS).toHaveLength(19);
+  });
+
   for (const vector of TEST_VECTORS) {
     it(`${ALGORITHM_LABELS[vector.algorithm]} (${vector.inputLabel}) matches ${vector.source}`, () => {
       const actual = computeHex(vector.algorithm, utf8.encode(vector.input));

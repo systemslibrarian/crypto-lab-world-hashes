@@ -83,10 +83,13 @@ The hero shows a live self-test badge (e.g. `✓ 19/19 test vectors verified`). 
 | Algorithm | Standard | Vectors |
 | --- | --- | --- |
 | SM3 | GM/T 0004-2012 | empty, `"abc"` |
-| SHA-256 / SHA-512 | FIPS 180-4 | empty, `"abc"`, fox |
-| SHA-3-256 / SHA-3-512 | FIPS 202 | empty, `"abc"` |
+| SHA-256 | FIPS 180-4 | empty, `"abc"`, fox |
+| SHA-512 | FIPS 180-4 | empty, `"abc"` |
+| SHA-3-256 | FIPS 202 | empty, `"abc"` |
+| SHA-3-512 | FIPS 202 | empty |
 | Streebog-256 / -512 | GOST R 34.11-2012 | empty, fox |
-| Kupyna-256 / -512 | DSTU 7564:2014 | empty, fox |
+| Kupyna-256 | DSTU 7564:2014 | empty, fox |
+| Kupyna-512 | DSTU 7564:2014 | empty |
 | Bash-256 | STB 34.101.77 §A.3.1 | empty |
 | LSH-256 | Wikipedia "LSH (hash function)" reference digest — KS X 3262 not consulted | `"abc"` |
 
