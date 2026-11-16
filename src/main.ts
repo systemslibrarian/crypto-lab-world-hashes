@@ -1404,7 +1404,7 @@ function renderAnchorsExhibit(): string {
 function renderDecisionExhibit(): string {
   return `
     <div class="panel">
-      <h2>Exhibit 5 — Six-Way Comparison and Decision Tree</h2>
+      <h2>Exhibit 6 — Seven-Way Comparison and Decision Tree</h2>
       <!-- role + tabindex, not just overflow-x. Below 860px .comparison-table
            takes min-width:700px, so this wrapper scrolls and holds nothing
            focusable - a WCAG 2.1.1 failure that only exists at phone width, and
@@ -1412,7 +1412,7 @@ function renderDecisionExhibit(): string {
            what makes the aria-label legal: on a role-less div it would be
            prohibited and silently discarded. Note this comment is inside a
            template literal, so it must contain no backtick. -->
-      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Six-way comparison of hash standards, scrollable">
+      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="Seven-way comparison of hash standards, scrollable">
         <table class="comparison-table">
           <thead>
             <tr>
