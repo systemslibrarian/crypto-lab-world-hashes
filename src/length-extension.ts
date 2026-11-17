@@ -29,9 +29,16 @@
  * The attack needs a hash you can resume from an arbitrary state, which no
  * library exposes. So SHA-256 and SM3 compression functions are implemented
  * here directly, from FIPS 180-4 and GM/T 0004-2012. They are cross-checked
- * against the audited `@noble/hashes` SHA-256 and the `sm-crypto` SM3 on every
- * test run and on every page load — if this file ever disagreed with them, the
- * page would say so rather than show you a forged digest it could not justify.
+ * against the `@noble/hashes` SHA-256 and the `sm-crypto` SM3 on every test run
+ * and on every page load — if this file ever disagreed with them, the page
+ * would say so rather than show you a forged digest it could not justify.
+ *
+ * On "audited": @noble/hashes records one independent audit, "at version 1.0.0,
+ * in Jan 2022, independently, by [Cure53]", scope "everything, besides blake3,
+ * sha3-addons, sha1 and argon2". This lab pins ^2.4.0, which that audit does not
+ * cover. The cross-check is therefore agreement between two implementations, not
+ * an appeal to anyone's audit; the FIPS 180-4 vectors in hashes.ts are the
+ * published anchor underneath both.
  *
  * The forging function `forgeFromTag` deliberately takes ONLY the published tag,
  * the guessed length and the suffix. It cannot see the secret, because it is

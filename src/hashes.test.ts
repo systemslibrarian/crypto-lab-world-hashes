@@ -1,3 +1,6 @@
+import nobleReadme from '../node_modules/@noble/hashes/README.md?raw';
+import pkg from '../package.json';
+import lengthExtensionSource from './length-extension.ts?raw';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -108,5 +111,27 @@ describe('provenance labels say what the standard actually prints', () => {
     expect(byAlgorithm('sha256')).toContain('FIPS 180-4');
     expect(byAlgorithm('sha3-256')).toContain('FIPS 202');
     expect(byAlgorithm('sm3')).toContain('GM/T 0004-2012');
+  });
+});
+
+describe('what "audited" covers for the pinned @noble/hashes', () => {
+  // src/length-extension.ts called it "the audited `@noble/hashes` SHA-256"
+  // with no version. The library records exactly one independent audit, "at
+  // version 1.0.0, in Jan 2022, independently, by [Cure53]", scope "everything,
+  // besides blake3, sha3-addons, sha1 and argon2"; this lab pins ^2.4.0, which
+  // that audit does not cover. Read from the installed package so an upgrade
+  // that changes the record fails here.
+  it('pins a version later than the one audit the library records', () => {
+    expect(pkg.dependencies['@noble/hashes']).toBe('^2.4.0');
+    expect(nobleReadme).toContain('The library has been audited');
+    expect(nobleReadme).toMatch(/at version 1\.0\.0, in Jan 2022, independently, by \[Cure53\]/);
+    expect(nobleReadme).not.toMatch(/at version 2\.\d+\.\d+, in [A-Z]/);
+  });
+
+  it('states that version where the library is described', () => {
+    const flat = lengthExtensionSource.replace(/\n\s*\*\s?/g, ' ').replace(/\s+/g, ' ');
+    expect(flat).not.toContain('the audited `@noble/hashes` SHA-256');
+    expect(flat).toContain('at version 1.0.0, in Jan 2022, independently, by [Cure53]');
+    expect(flat).toContain('This lab pins ^2.4.0');
   });
 });
