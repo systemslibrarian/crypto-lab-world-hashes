@@ -116,10 +116,12 @@ export const TEST_VECTORS: TestVector[] = [
   { algorithm: 'sha3-256', input: '', inputLabel: 'empty string', expected: 'a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a', source: 'FIPS 202' },
   { algorithm: 'sha3-256', input: 'abc', inputLabel: '"abc"', expected: '3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532', source: 'FIPS 202' },
   { algorithm: 'sha3-512', input: '', inputLabel: 'empty string', expected: 'a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26', source: 'FIPS 202' },
-  // Streebog — GOST R 34.11-2012
-  { algorithm: 'streebog256', input: '', inputLabel: 'empty string', expected: '3f539a213e97c802cc229d474c6aa32a825a360b2a933a949fd925208d9ce1bb', source: 'GOST R 34.11-2012' },
+  // Streebog — GOST R 34.11-2012. The standard's examples (RFC 6986 §10,
+  // "Examples (Informative)") are only M1 and M2; neither the empty message
+  // nor the fox string appears in it, so all four rows say so.
+  { algorithm: 'streebog256', input: '', inputLabel: 'empty string', expected: '3f539a213e97c802cc229d474c6aa32a825a360b2a933a949fd925208d9ce1bb', source: 'widely published reference value (not in GOST R 34.11-2012 / RFC 6986, whose only examples are M1 and M2)' },
   { algorithm: 'streebog256', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: '3e7dea7f2384b6c5a3d0e24aaa29c05e89ddd762145030ec22c71a6db8b2c1f4', source: 'widely published reference value (not in GOST R 34.11-2012 / RFC 6986)' },
-  { algorithm: 'streebog512', input: '', inputLabel: 'empty string', expected: '8e945da209aa869f0455928529bcae4679e9873ab707b55315f56ceb98bef0a7362f715528356ee83cda5f2aac4c6ad2ba3a715c1bcd81cb8e9f90bf4c1c1a8a', source: 'GOST R 34.11-2012' },
+  { algorithm: 'streebog512', input: '', inputLabel: 'empty string', expected: '8e945da209aa869f0455928529bcae4679e9873ab707b55315f56ceb98bef0a7362f715528356ee83cda5f2aac4c6ad2ba3a715c1bcd81cb8e9f90bf4c1c1a8a', source: 'widely published reference value (not in GOST R 34.11-2012 / RFC 6986, whose only examples are M1 and M2)' },
   { algorithm: 'streebog512', input: 'The quick brown fox jumps over the lazy dog', inputLabel: '"…lazy dog"', expected: 'd2b793a0bb6cb5904828b5b6dcfb443bb8f33efc06ad09368878ae4cdc8245b97e60802469bed1e7c21a64ff0b179a6a1e0bb74d92965450a0adab69162c00fe', source: 'widely published reference value (not in GOST R 34.11-2012 / RFC 6986)' },
   // Kupyna — DSTU 7564:2014
   { algorithm: 'kupyna256', input: '', inputLabel: 'empty string', expected: 'cd5101d1ccdf0d1d1f4ada56e888cd724ca1a0838a3521e7131d4fb78d0f5eb6', source: 'DSTU 7564:2014' },

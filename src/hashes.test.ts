@@ -85,3 +85,28 @@ describe('avalanche behaviour', () => {
     expect(ratio).toBeLessThan(0.7);
   });
 });
+
+describe('provenance labels say what the standard actually prints', () => {
+  it('claims no Streebog vector as a GOST R 34.11-2012 example', () => {
+    // GOST R 34.11-2012 / RFC 6986 §10 "Examples (Informative)" gives exactly
+    // two: M1 (a 63-byte digit string) and M2 (a Russian sentence). The empty
+    // message is not among them, so the two empty-string rows were mislabelled
+    // "GOST R 34.11-2012" while the fox rows already disclaimed it.
+    const streebog = TEST_VECTORS.filter((v) => v.algorithm.startsWith('streebog'));
+    expect(streebog).toHaveLength(4);
+    for (const vector of streebog) {
+      expect(vector.source, `${vector.algorithm} (${vector.inputLabel})`).toMatch(
+        /not in GOST R 34\.11-2012 \/ RFC 6986/,
+      );
+      expect(vector.source).not.toBe('GOST R 34.11-2012');
+    }
+  });
+
+  it('keeps the standard-sourced labels for the vectors that really are in a standard', () => {
+    const byAlgorithm = (algorithm: string) =>
+      TEST_VECTORS.filter((v) => v.algorithm === algorithm).map((v) => v.source);
+    expect(byAlgorithm('sha256')).toContain('FIPS 180-4');
+    expect(byAlgorithm('sha3-256')).toContain('FIPS 202');
+    expect(byAlgorithm('sm3')).toContain('GM/T 0004-2012');
+  });
+});

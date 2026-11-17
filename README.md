@@ -87,7 +87,7 @@ The hero shows a live self-test badge (e.g. `✓ 19/19 test vectors verified`). 
 | SHA-512 | FIPS 180-4 | empty, `"abc"` |
 | SHA-3-256 | FIPS 202 | empty, `"abc"` |
 | SHA-3-512 | FIPS 202 | empty |
-| Streebog-256 / -512 | GOST R 34.11-2012 | empty, fox |
+| Streebog-256 / -512 | widely published reference digests — GOST R 34.11-2012 / RFC 6986 print only the M1 and M2 examples | empty, fox |
 | Kupyna-256 | DSTU 7564:2014 | empty, fox |
 | Kupyna-512 | DSTU 7564:2014 | empty |
 | Bash-256 | STB 34.101.77 §A.3.1 | empty |
