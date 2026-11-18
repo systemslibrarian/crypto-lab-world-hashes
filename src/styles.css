@@ -362,6 +362,30 @@ textarea {
   vertical-align: top;
 }
 
+/* National-standards panel (text only), rendered below the exhibit tabs. */
+.standards-panel p,
+.standards-panel li {
+  line-height: 1.7;
+}
+
+.standards-panel h3 {
+  margin: 1.4rem 0 0.5rem;
+}
+
+.standards-status {
+  border-left: 3px solid var(--border);
+  padding-left: 0.9rem;
+}
+
+.standards-timeline {
+  margin: 0.6rem 0 1rem 1.2rem;
+  padding: 0;
+}
+
+.standards-timeline li {
+  margin: 0.3rem 0;
+}
+
 .decision-list {
   margin: 0;
   padding-left: 1.15rem;

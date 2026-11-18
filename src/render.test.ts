@@ -12,10 +12,11 @@ beforeAll(async () => {
 });
 
 describe('initial render', () => {
-  // Six since the "Break it" attack lab landed (was five).
-  it('mounts the six exhibit tabs', () => {
+  // Seven since the national-standards panel landed as a tab (was six, and
+  // five before the "Break it" attack lab).
+  it('mounts the seven exhibit tabs', () => {
     const tabs = document.querySelectorAll('[role="tab"]');
-    expect(tabs).toHaveLength(6);
+    expect(tabs).toHaveLength(7);
     expect(document.querySelector('#tab-break')?.textContent).toContain('Break it');
   });
 

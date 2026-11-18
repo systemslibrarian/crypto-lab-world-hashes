@@ -21,7 +21,7 @@ import {
 } from './collision-search';
 import type { CollisionResult } from './collision-search';
 
-type TabId = 'sm3' | 'streebog' | 'kupyna' | 'anchors' | 'break' | 'decision';
+type TabId = 'sm3' | 'streebog' | 'kupyna' | 'anchors' | 'break' | 'decision' | 'standards';
 type InputMode = 'text' | 'hex';
 type DigestSize = 256 | 512;
 
@@ -1502,6 +1502,150 @@ function supportsSelection(el: Element | null): boolean {
   return ['text', 'search', 'url', 'tel', 'password'].includes(el.type);
 }
 
+/**
+ * National-standards panel, the seventh tab. Text only: it draws the pattern
+ * this lab's exhibits show (same family, different specification) and follows
+ * it into the post-quantum competition China is running now.
+ *
+ * It is a tab and not a block under the tabs for a measured reason. The page
+ * background is two radial washes positioned as percentages of the document,
+ * so anything that lengthens EVERY state slides the amber wash down behind the
+ * tab bar. Rendered under the tabs, this panel added 3,731 px at 380 px width
+ * and took the tab buttons' border from above 3:1 to 2.97:1 against their
+ * surround; the WCAG gate caught it. As a tab it is only on the page when
+ * selected, and that state is shorter than the Comparison tab already is.
+ *
+ * Nothing here is computed. Every date, count and quotation is cited in the
+ * panel's own Sources line and in the README section of the same name. Note
+ * this function returns a template literal, so its comments hold no backtick.
+ */
+function renderNationalStandardsPanel(): string {
+  return `
+    <div class="panel standards-panel" id="national-standards">
+      <h2 id="national-standards-heading">Exhibit 7 — National standards: same families, separate specifications</h2>
+      <p>
+        Every national hash in this lab is an iterated hash of a kind you already know from SHA-2 or
+        SHA-3. That is the usual shape of a national standard: <strong>the same mathematical family as
+        everyone else, with a different construction, different parameters, and domestic control of
+        the specification</strong>. It has rarely meant different mathematics.
+      </p>
+
+      <h3>The pattern, in China's SM suite</h3>
+      <div class="compare-table-wrap" role="region" tabindex="0" aria-label="International and Chinese standards compared by family, scrollable">
+        <table class="comparison-table standards-table">
+          <caption class="sr-only">For three roles, a widely used international standard, the Chinese national standard, what the two share, and what differs</caption>
+          <thead>
+            <tr>
+              <th scope="col">Role</th>
+              <th scope="col">Widely used</th>
+              <th scope="col">Chinese national standard</th>
+              <th scope="col">Same family</th>
+              <th scope="col">What differs</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Hash</th>
+              <td>SHA-256 (FIPS 180-4)</td>
+              <td>SM3 (GM/T 0004-2012, GB/T 32905-2016)</td>
+              <td>Merkle–Damgård hashes with 512-bit blocks, 64 rounds and a 256-bit digest</td>
+              <td>A different message expansion and compression function (Exhibit 1). Both hand out
+                their final state, so both are open to length extension (Exhibit 5).</td>
+            </tr>
+            <tr>
+              <th scope="row">Block cipher</th>
+              <td>AES (FIPS 197)</td>
+              <td>SM4 (GB/T 32907-2016)</td>
+              <td>128-bit block ciphers built from S-boxes and linear mixing</td>
+              <td>A substitution-permutation network against a 32-round non-balanced Feistel network;
+                SM4 takes a 128-bit key only
+                (<a href="https://systemslibrarian.github.io/crypto-lab-world-ciphers/">World Ciphers</a>,
+                Exhibit 3).</td>
+            </tr>
+            <tr>
+              <th scope="row">Signature</th>
+              <td>ECDSA (FIPS 186-5), commonly on NIST P-256</td>
+              <td>SM2 (GB/T 32918)</td>
+              <td>Elliptic-curve signatures over a prime field</td>
+              <td>A different curve and a different signing equation. SM2 hashes with SM3 and binds a
+                signer identity into the digest
+                (<a href="https://systemslibrarian.github.io/crypto-lab-sm2-forge/">SM2 Forge</a>).
+                Neither is implemented in this lab.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The two entries in each row do not interoperate: a verifier that expects a SHA-256 digest will
+        not accept an SM3 digest of the same bytes, which is what Exhibit 1 puts side by side.
+        "Different" is a statement about compatibility. It is not evidence about strength in either
+        direction.
+      </p>
+
+      <h3>The post-quantum continuation</h3>
+      <p class="standards-status" id="standards-status">
+        <strong>Status.</strong> As of November 2026, NGCC is in its first round; the ICCS proposal pages
+        list Round 1 candidates only (checked 18 November 2026). Nothing in round one is standardized or
+        deployed.
+      </p>
+      <p>
+        China's Institute of Commercial Cryptography Standards (ICCS) is running NGCC
+        (Next-generation Commercial Cryptographic Algorithms), an open competition on the NIST model, for
+        a new generation of commercial algorithms after the SM suite. It has a hash track of its own.
+      </p>
+      <ul class="standards-timeline">
+        <li><strong>5 February 2025.</strong> ICCS launches NGCC and publishes draft requirements for comment.</li>
+        <li><strong>9 October 2025.</strong> Formal calls for public-key and hash proposals.</li>
+        <li><strong>30 June 2026.</strong> Submissions close.</li>
+        <li><strong>4 September 2026.</strong> Draft requirements for a block-cipher track are published for comment.</li>
+        <li><strong>20 September 2026.</strong> 119 first-round candidates are published: 35 hash
+          functions, 34 signature schemes, 41 key-encapsulation mechanisms and 9 key-exchange schemes.</li>
+      </ul>
+      <p>
+        The hash track matters to the other tracks. SM3 has a fixed 256-bit digest and is not an
+        extendable-output function. Round-one public-key submissions call hash and XOF helper functions
+        supplied by ICCS, which ICCS says "are only used to verify the correctness of implementations
+        and preliminarily evaluate performance, without considering security" and "will be replaced with
+        new auxiliary functions based on new cryptographic hash algorithms and XOFs" in later rounds.
+      </p>
+      <p>
+        The 84 public-key candidates come from the families other post-quantum efforts use: 43
+        lattice-based, 21 code-based, 6 multivariate, 5 isogeny-based, 4 hash-based signatures, 4
+        symmetric (VOLE-in-the-head) and 1 other group action. What will differ is the specific
+        algorithm. ICCS states that NGCC "will not accept the algorithms that are in or have finished the
+        standardization process in international organizations, countries and regions, or related
+        variants with insignificant modifications." So an NGCC selection will not be ML-KEM, ML-DSA or
+        SLH-DSA and will not interoperate with them, in the same way that SM3 does not interoperate with
+        SHA-256.
+      </p>
+      <p>
+        <strong>Stated reasons, and commentary.</strong> ICCS's own wording is that the programme is "in
+        response to the threat of quantum computing" and meant to "facilitate the standardization of the
+        next-generation commercial cryptographic algorithms." Outside commentary describes it as part of a
+        broader push for cryptographic sovereignty, and expects finalists around 2029. Those two points
+        are commentary, not ICCS statements.
+      </p>
+      <p class="small standards-sources">
+        <strong>Sources.</strong>
+        Dates of launch, call and deadline:
+        <a href="https://niccs.org.cn/niccs/Notice/pc/content/content_1975896137741635584.html">ICCS, Call for Proposals for the Next-generation Public-Key Cryptographic Algorithms</a>
+        (9 October 2025). The acceptance rule and the helper-function rule: ICCS, <em>Submission
+        Requirements for Public-Key Cryptographic Algorithms</em> (October 2025), §1(5) and §3.4(5),
+        attached to that call. The stated purpose: ICCS, <em>Feedback on the Comments Received</em>
+        (October 2025), §1, attached to that call. The hash call, the block-cipher draft, the candidate
+        and family counts, and the remark that SM3 is not an XOF: M.-J. O. Saarinen, <em>Chinese NGCC
+        Algorithms: The First Week of AI Cryptanalysis</em> (29 September 2026), abstract, §1.1, Table 1
+        and §5. Commentary:
+        <a href="https://postquantum.com/post-quantum/pqc-standards-fragmentation-multinationals/">postquantum.com on standards fragmentation</a>
+        and
+        <a href="https://postquantum.com/security-pqc/china-ngcc-candidate-flaws/">on the first round</a>
+        (23 September 2026);
+        <a href="https://pqc-security.org/countries/china">pqc-security.org, China</a>.
+      </p>
+    </div>
+  `;
+}
+
 function render(): void {
   const app = document.querySelector<HTMLDivElement>('#app');
   if (!app) {
@@ -1528,7 +1672,8 @@ function render(): void {
     { id: 'kupyna', label: '3. Kupyna' },
     { id: 'anchors', label: '4. Anchors' },
     { id: 'break', label: '5. Break it' },
-    { id: 'decision', label: '6. Comparison' }
+    { id: 'decision', label: '6. Comparison' },
+    { id: 'standards', label: '7. Standards' }
   ];
 
   const tabButtons = tabs.map((t) => {
@@ -1548,7 +1693,8 @@ function render(): void {
     kupyna: renderKupynaExhibit(),
     break: renderBreakItExhibit(),
     anchors: renderAnchorsExhibit(),
-    decision: renderDecisionExhibit()
+    decision: renderDecisionExhibit(),
+    standards: renderNationalStandardsPanel()
   };
 
   const panelSections = tabs.map((t) => {

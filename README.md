@@ -24,7 +24,7 @@ The page opens with a **ground-floor "what is a cryptographic hash?" panel** tha
 
 **[systemslibrarian.github.io/crypto-lab-world-hashes](https://systemslibrarian.github.io/crypto-lab-world-hashes/)**
 
-A ground-floor intro panel plus six exhibits:
+A ground-floor intro panel plus seven tabs — six exhibits and a text-only standards panel:
 
 0. **What is a cryptographic hash?** — the four properties in plain language, demonstrated live: type anything and watch the SHA-256 digest stay a fixed 256 bits while one extra character scrambles it; a collapsible explains one-wayness and collisions.
 1. **SM3 (China)** with SHA-256 side-by-side, a labelled **Merkle–Damgård mechanism diagram** (message blocks chaining through a compression function to an exposed final state → length-extension), and a **user-driven avalanche** — click any character to flip it yourself and watch the digest re-scramble.
@@ -38,6 +38,7 @@ A ground-floor intro panel plus six exhibits:
    - **A negative claim, backed by a fixture.** Bash carries **no** length-extension countermeasure — no length encoding, no checksum, no output transformation. Neither does SHA-256, which this same page forges. The table prints `none` in both places and puts the actual difference beside it as a measurement: how many state bits the published digest withholds (SHA-256: **0 of 256** — the digest *is* the chaining state; Bash: **1280 of 1536**). The page states plainly that a green row for Bash means the attack has no entry point, *not* that `H(secret ‖ message)` is a sound MAC. `e2e/claims.spec.ts` drives the page into that all-green state and asserts the limitation is visible in it.
    - **A real birthday collision search.** Truncate any of the eleven digests to 8–32 bits and watch a genuine search find two distinct inputs that agree on that prefix — rechecked, with the full digests shown differing. The measured hash count is compared against √(π/2·2ⁿ). Starve the budget and the verdict refuses to claim anything.
 6. **Seven-way comparison table + decision tree**, with the **Trust-level column explicitly labelled editorial opinion** and each grade sourced in an expandable note (e.g. Streebog's caution cites Perrin, IACR ToSC 2019, on the shared S-box).
+7. **National standards** (the seventh tab) — text only: why a national standard has usually meant the same mathematical family with a different construction, parameters and specification owner (SM3 beside SHA-256, SM4 beside AES, SM2 beside ECDSA), and how China's NGCC competition, which has a hash track of its own, continues that pattern into post-quantum algorithms. See *National standards panel* below.
 
 All hash outputs are real — no simulation. Every digest is produced in your browser by [`src/hashes.ts`](src/hashes.ts), the same module the test suite checks. Each exhibit shows a **visual avalanche diff** (changed hex nibbles highlighted, with bit-diffusion percentage against the ideal ~50%) and a live **input byte-length** readout. Nothing is sent to a server — all hashing is local.
 
@@ -50,6 +51,33 @@ All hash outputs are real — no simulation. Every digest is produced in your br
 - Reaching for a national hash outside its regulatory requirement trades SHA-2/SHA-3 scrutiny and tooling for weaker ecosystem support with no security gain.
 - Collision and second-preimage resistance are assumptions, not guarantees; truncating a digest or misusing it for password storage (no salt/KDF) undermines the intended security.
 - Mismatched variants (e.g. confusing the 256-bit and 512-bit outputs, or differing byte/endianness conventions between standards) break interoperability between implementations.
+
+## National standards panel
+
+*As of November 2026, NGCC is in its first round; the ICCS proposal pages list Round 1 candidates only (checked 18 November 2026). Nothing in round one is standardized or deployed.*
+
+The seventh tab makes one point: national standards have usually meant **the same mathematical families with different constructions, parameters and domestic control of the specification**, not different mathematics. It is text only and implements nothing new.
+
+Three rows carry the classical pattern. SM3 beside SHA-256 restates what Exhibits 1 and 5 demonstrate; SM4 beside AES is demonstrated in [World Ciphers](https://systemslibrarian.github.io/crypto-lab-world-ciphers/). SM2 beside ECDSA on NIST P-256 is text only here; [SM2 Forge](https://systemslibrarian.github.io/crypto-lab-sm2-forge/) implements SM2.
+
+The second half follows the pattern into post-quantum cryptography. NGCC (Next-generation Commercial Cryptographic Algorithms) is an open competition run by China's Institute of Commercial Cryptography Standards (ICCS) on the NIST model, with a hash track alongside its public-key track.
+
+| Statement in the panel | Source |
+|---|---|
+| ICCS launched NGCC on 5 February 2025 | [ICCS call for public-key proposals](https://niccs.org.cn/niccs/Notice/pc/content/content_1975896137741635584.html), 9 October 2025, first sentence |
+| Formal public-key call on 9 October 2025; deadline 24:00 Beijing time, 30 June 2026 | The same page |
+| Hash call also on 9 October 2025; draft block-cipher requirements on 4 September 2026 | Saarinen, *Chinese NGCC Algorithms: The First Week of AI Cryptanalysis* (29 September 2026), §1.1 |
+| 119 first-round candidates on 20 September 2026: 35 hash, 34 signature, 41 KEM, 9 key exchange | The same paper, abstract and §1.1 |
+| SM3 has a fixed 256-bit digest and is not an extendable-output function | The same paper, §5 |
+| Public-key submissions use ICCS-supplied hash and XOF helpers that "are only used to verify the correctness of implementations and preliminarily evaluate performance, without considering security" and "will be replaced with new auxiliary functions based on new cryptographic hash algorithms and XOFs" | ICCS, *Submission Requirements for Public-Key Cryptographic Algorithms* (October 2025), §3.4(5), attached to the call |
+| 84 public-key candidates by family: 43 lattice, 21 code, 6 multivariate, 5 isogeny, 4 hash-based signatures, 4 symmetric VOLE-in-the-head, 1 other group action | Saarinen, Table 1 |
+| NGCC "will not accept the algorithms that are in or have finished the standardization process in international organizations, countries and regions, or related variants with insignificant modifications" | ICCS, *Submission Requirements*, §1(5) |
+| The programme is "in response to the threat of quantum computing" and meant to "facilitate the standardization of the next-generation commercial cryptographic algorithms" | ICCS, *Feedback on the Comments Received on the Draft Submission Requirements and Evaluation Criteria* (October 2025), §1, attached to the call |
+| Commentary: a push for cryptographic sovereignty; finalists around 2029 | [postquantum.com on the first round](https://postquantum.com/security-pqc/china-ngcc-candidate-flaws/) (23 September 2026) and [on standards fragmentation](https://postquantum.com/post-quantum/pqc-standards-fragmentation-multinationals/). Labelled as commentary on the page; neither is an ICCS statement |
+
+What the panel does not claim: that any NGCC candidate is secure or insecure, that a national standard is weaker or stronger for being national, or that ICCS has announced a schedule beyond round one. `src/standards-panel.test.ts` checks that the panel is the seventh tab, carries the dated status line, and that the counts it prints add up.
+
+It is a tab rather than a block under the tabs for a measured reason. The page background is two radial washes positioned as percentages of the document, so anything that lengthens every state slides the amber wash down behind the tab bar. Rendered under the tabs, the panel added 3,731 px at 380 px width and took the tab buttons' border from above 3:1 to 2.97:1 against their surround; the WCAG gate caught it. As a tab it is on the page only when selected, and `e2e/national-standards.spec.ts` asserts that state is no taller than the Comparison exhibit.
 
 ## Real-World Usage
 

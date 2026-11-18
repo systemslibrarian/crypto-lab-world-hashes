@@ -50,16 +50,16 @@ describe('keyboard tab navigation (ARIA tabs)', () => {
   it('ArrowLeft wraps from the first tab to the last', () => {
     tab('sm3').click();
     pressKey(tab('sm3'), 'ArrowLeft');
-    expect(document.activeElement?.id).toBe('tab-decision');
-    expect(tab('decision').getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement?.id).toBe('tab-standards');
+    expect(tab('standards').getAttribute('aria-selected')).toBe('true');
   });
 
   it('Home and End jump to the first and last tab', () => {
     tab('streebog').click();
     pressKey(tab('streebog'), 'End');
-    expect(document.activeElement?.id).toBe('tab-decision');
+    expect(document.activeElement?.id).toBe('tab-standards');
 
-    pressKey(tab('decision'), 'Home');
+    pressKey(tab('standards'), 'Home');
     expect(document.activeElement?.id).toBe('tab-sm3');
   });
 

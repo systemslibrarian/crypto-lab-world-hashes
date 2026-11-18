@@ -11,8 +11,8 @@ export const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 /** A phone-width viewport, for the WCAG 1.4.10 reflow half of the gate. */
 export const NARROW = { width: 380, height: 800 };
 
-/** The six exhibit tabs, in the order the tablist renders them. */
-export const TAB_IDS = ['sm3', 'streebog', 'kupyna', 'anchors', 'break', 'decision'] as const;
+/** The seven exhibit tabs, in the order the tablist renders them. */
+export const TAB_IDS = ['sm3', 'streebog', 'kupyna', 'anchors', 'break', 'decision', 'standards'] as const;
 
 /**
  * Shared machinery for the WCAG gate.
@@ -260,8 +260,8 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   // (`display:none !important`) while staying in the DOM so its JS keeps working.
   await expect(page.locator('#theme-toggle')).toBeHidden();
 
-  // ── Tabs: six, exactly one selected, five panels hidden ──────────────────
-  await expect(page.locator('.tabs[role="tablist"] .tab-button')).toHaveCount(6);
+  // ── Tabs: seven, exactly one selected, six panels hidden ─────────────────
+  await expect(page.locator('.tabs[role="tablist"] .tab-button')).toHaveCount(7);
   await expect(page.locator('#tab-sm3')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#panel-sm3')).toBeVisible();
   for (const id of TAB_IDS.filter((t) => t !== 'sm3')) {
@@ -923,6 +923,12 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await expect(page.locator('#lsh-crosscheck .kat-pass')).toBeVisible();
   await expect(page.locator('#lsh-crosscheck .kat-fail')).toHaveCount(0);
   await scanAt('Comparison tab, nineteen known-answer vectors listed as passing');
+
+  // ── Exhibit 7: the national-standards panel, text and one table ──────────
+  await openTab(page, 'standards');
+  await expect(page.locator('#panel-standards #national-standards tbody tr')).toHaveCount(3);
+  await expect(page.locator('#panel-standards #standards-status')).toBeVisible();
+  await scanAt('National standards tab, the three-row family table and the dated status line');
 
   await page.locator('#tab-sm3').hover();
   await scanAt('the finished page with an inactive tab hovered');
