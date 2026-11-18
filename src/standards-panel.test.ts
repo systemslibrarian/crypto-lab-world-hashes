@@ -78,8 +78,10 @@ describe('national-standards panel', () => {
     const links = Array.from(panel().querySelectorAll<HTMLAnchorElement>('a[href^="http"]')).map((a) => a.href);
     expect(links).toContain('https://niccs.org.cn/niccs/Notice/pc/content/content_1975896137741635584.html');
     expect(links).toContain('https://pqc-security.org/countries/china');
-    expect(links.some((href) => href.includes('crypto-lab-sm2-forge'))).toBe(true);
-    expect(links.some((href) => href.includes('eprint.iacr.org'))).toBe(false);
+    expect(links).toContain('https://systemslibrarian.github.io/crypto-lab-sm2-forge/');
+    // Compared as parsed hostnames, not substrings: a substring test also matches
+    // a host that merely contains the name.
+    expect(links.map((href) => new URL(href).hostname)).not.toContain('eprint.iacr.org');
   });
 
   it('leaves the other exhibits working after it has been opened', () => {
