@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeAll, describe, expect, it } from 'vitest';
+import readme from '../README.md?raw';
 
 // Importing main.ts boots the app against the DOM, so the mount node must
 // exist first.
@@ -72,16 +73,45 @@ describe('national-standards panel', () => {
     expect(byFamily.reduce((a, b) => a + b, 0)).toBe(publicKey);
   });
 
-  it('labels commentary as commentary and links the sources it names', () => {
+  it('labels commentary as commentary and attributes each claim to the article that makes it', () => {
     open('standards');
-    expect(squash(panel().textContent)).toContain('Those two points are commentary, not ICCS statements.');
+    const text = squash(panel().textContent);
+    expect(text).toContain('Both are commentary, not ICCS statements.');
+    // The sovereignty reading and "2029 at the earliest for standards" are the
+    // first-round article's; "finalists around 2029" is the fragmentation article's.
+    expect(text).toMatch(/article on the first round \(23 September 2026\) describes NGCC as part of a "broader push for cryptographic sovereignty", and its author treats 2029 as the earliest plausible date for NGCC standards/);
+    expect(text).toMatch(/An earlier article on the same site \(April 2026\) says the process targets finalists around 2029/);
+  });
+
+  it('links the sources it names, and nothing that supports no statement in the panel', () => {
+    open('standards');
     const links = Array.from(panel().querySelectorAll<HTMLAnchorElement>('a[href^="http"]')).map((a) => a.href);
+    // Both ICCS calls are cited from ICCS, and the survey paper is linked.
     expect(links).toContain('https://niccs.org.cn/niccs/Notice/pc/content/content_1975896137741635584.html');
-    expect(links).toContain('https://pqc-security.org/countries/china');
+    expect(links).toContain('https://www.niccs.org.cn/niccs/Notice/pc/content/content_1975892908773478400.html');
+    expect(links).toContain('https://eprint.iacr.org/2026/2266');
     expect(links).toContain('https://systemslibrarian.github.io/crypto-lab-sm2-forge/');
     // Compared as parsed hostnames, not substrings: a substring test also matches
     // a host that merely contains the name.
-    expect(links.map((href) => new URL(href).hostname)).not.toContain('eprint.iacr.org');
+    const hosts = [...new Set(links.map((href) => new URL(href).hostname))].sort();
+    expect(hosts).toEqual(['eprint.iacr.org', 'niccs.org.cn', 'postquantum.com', 'systemslibrarian.github.io', 'www.niccs.org.cn']);
+  });
+
+  it('cites the same outside pages as the README source table', () => {
+    open('standards');
+    const links = Array.from(panel().querySelectorAll<HTMLAnchorElement>('a[href^="http"]')).map((a) => a.href);
+    const tableStart = readme.indexOf('| Statement in the panel | Source |');
+    const tableEnd = readme.indexOf('What the panel does not claim');
+    expect(tableStart).toBeGreaterThan(0);
+    expect(tableEnd).toBeGreaterThan(tableStart);
+    const table = readme.slice(tableStart, tableEnd);
+    const fleet = (href: string): boolean => new URL(href).hostname === 'systemslibrarian.github.io';
+    // Panel to README: every outside page the panel links is in the table.
+    for (const href of links.filter((h) => !fleet(h))) expect(table, `README lists ${href}`).toContain(`(${href})`);
+    // README to panel: every outside page in the table is linked from the panel.
+    const cited = [...table.matchAll(/\((https:\/\/[^)\s]+)\)/g)].map((m) => m[1]).filter((h) => !fleet(h));
+    expect(cited.length).toBeGreaterThan(0);
+    for (const href of cited) expect(links, `the panel links ${href}`).toContain(href);
   });
 
   it('leaves the other exhibits working after it has been opened', () => {
