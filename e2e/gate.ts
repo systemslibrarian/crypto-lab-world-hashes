@@ -240,9 +240,9 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
 
   // The `hidden` attribute really removes an element. `[hidden]` has specificity
   // (0,1,0) — identical to a class — so any later `.foo { display: … }` beats it
-  // and the attribute silently does nothing. This lab hides its five inactive tab
+  // and the attribute silently does nothing. This lab hides its six inactive tab
   // panels with `hidden` and nothing else, so if that ever stopped applying the
-  // page would show all six exhibits at once and no assertion here would notice.
+  // page would show all seven exhibits at once and no assertion here would notice.
   // Measured from a live element rather than inferred from the CSS.
   expect(
     await page.evaluate(() => {
@@ -679,7 +679,7 @@ async function openDisclosures(page: Page, expected: number): Promise<void> {
  *
  * Six things shape this drive:
  *
- *  - ONE TAB AT A TIME, REACHED BY ITS TAB. Five of the six panels ship behind
+ *  - ONE TAB AT A TIME, REACHED BY ITS TAB. Six of the seven panels ship behind
  *    the `hidden` attribute; each is opened by clicking its `role="tab"` button
  *    and `openTab` asserts that exactly one panel is visible afterwards. The gate
  *    this replaces stripped `hidden` from all five before its only scan, which

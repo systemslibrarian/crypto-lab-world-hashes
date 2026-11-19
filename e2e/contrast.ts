@@ -712,7 +712,7 @@ export async function auditContrast(page: Page, within = 'body *'): Promise<Cont
      * rather than read, which is why this uses `paintAt` rather than
      * `backgroundColor`. In the dark theme that surface is `#081018`; falling
      * through to white instead would fabricate a failure for every element on a
-     * page that runs six exhibits deep.
+     * page that runs seven exhibits deep.
      */
     const canvasBackground = ((): RGBA => {
       const rootCs = styleOf(document.documentElement);

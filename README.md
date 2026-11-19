@@ -24,7 +24,7 @@ The page opens with a **ground-floor "what is a cryptographic hash?" panel** tha
 
 **[systemslibrarian.github.io/crypto-lab-world-hashes](https://systemslibrarian.github.io/crypto-lab-world-hashes/)**
 
-A ground-floor intro panel plus seven tabs — six exhibits and a text-only standards panel:
+A ground-floor intro panel plus seven exhibits, one per tab. The seventh is a text-only standards panel:
 
 0. **What is a cryptographic hash?** — the four properties in plain language, demonstrated live: type anything and watch the SHA-256 digest stay a fixed 256 bits while one extra character scrambles it; a collapsible explains one-wayness and collisions.
 1. **SM3 (China)** with SHA-256 side-by-side, a labelled **Merkle–Damgård mechanism diagram** (message blocks chaining through a compression function to an exposed final state → length-extension), and a **user-driven avalanche** — click any character to flip it yourself and watch the digest re-scramble.
