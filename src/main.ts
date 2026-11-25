@@ -231,7 +231,7 @@ function flipStrip(input: string, flipIndex: number): string {
       const display = isSpace ? '' : escapeHtml(c);
       const selected = i === flipIndex;
       return `<button type="button" class="flip-cell${selected ? ' flip-cell-active' : ''}${isSpace ? ' flip-cell-space' : ''}"
-        id="sm3-flip-${i}" data-flip-index="${i}" aria-pressed="${selected}"
+        data-flip-index="${i}" aria-pressed="${selected}"
         aria-label="${isSpace ? 'Space' : escapeHtml(c)}: flip character ${i + 1}">${display}</button>`;
     })
     .join('');
@@ -1658,7 +1658,8 @@ function render(): void {
   }
 
   const activeEl = document.activeElement as HTMLElement | null;
-  const focusId = activeEl?.id ?? '';
+  const focusId = activeEl?.id;
+  const flipIndex = activeEl?.dataset.flipIndex;
   let cursorStart = 0;
   let cursorEnd = 0;
   const carryCursor = supportsSelection(activeEl);
@@ -1748,13 +1749,15 @@ function render(): void {
     </main>
   `;
 
-  if (focusId) {
-    const restored = document.getElementById(focusId);
-    if (restored) {
-      restored.focus({ preventScroll: true });
-      if (supportsSelection(restored)) {
-        (restored as HTMLTextAreaElement | HTMLInputElement).setSelectionRange(cursorStart, cursorEnd);
-      }
+  const restored = focusId
+    ? document.getElementById(focusId)
+    : flipIndex !== undefined
+      ? app.querySelector<HTMLButtonElement>(`[data-flip-index="${CSS.escape(flipIndex)}"]`)
+      : null;
+  if (restored) {
+    restored.focus({ preventScroll: true });
+    if (supportsSelection(restored)) {
+      (restored as HTMLTextAreaElement | HTMLInputElement).setSelectionRange(cursorStart, cursorEnd);
     }
   }
 }
