@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 
 /**
@@ -274,4 +275,77 @@ test('the negative claim is retired when the inputs that produced it change', as
   // Re-running restores it rather than leaving the panel permanently empty.
   await page.locator('#break-run-resistant').click();
   await expect(page.locator('[data-negative-claim]')).toBeVisible();
+});
+
+test('Unicode selections hash the displayed code point replacement and retain keyboard focus', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('#tab-sm3').click();
+  const panel = page.locator('#panel-sm3');
+  const input = page.locator('#sm3-input');
+  const preview = panel.locator('p').filter({ hasText: 'Modified input:' }).locator('code');
+  const cells = panel.locator('.flip-cell');
+  const sha = panel.locator('.card').filter({ has: page.locator('.avalanche-meter') }).nth(1);
+  const sm3 = panel.locator('.card').filter({ has: page.locator('.avalanche-meter') }).first();
+  await input.fill('A🦊B');
+  await expect(cells).toHaveCount(3);
+  // Reference SM3 digests computed independently with OpenSSL.
+  for (const [index, text, digest] of [
+    [2, 'A🦊#', 'b4f082fdba808ac40ef0b11406a51ab704159ff595fbdf26aca3b69ab188f1b2'],
+    [1, 'A#B', '9ab1e3fc8a5374c48ffdc3d01e4df0643fc82c9b84ab479eaf11b2f108bd8384'],
+  ] as const) {
+    await cells.nth(index).focus();
+    await page.keyboard.press('Enter');
+    await expect(cells.nth(index)).toBeFocused();
+    await expect(cells.nth(index)).toHaveAttribute('aria-pressed', 'true');
+    await expect(preview).toHaveText(text);
+    await expect(sm3.locator('.digest-block').last()).toHaveText(digest);
+    const expected = await page.evaluate(async (value) => {
+      const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+      return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+    }, text);
+    await expect(sha.locator('.digest-block').last()).toHaveText(expected);
+  }
+  await input.fill('👩‍💻"');
+  await expect(cells).toHaveCount(4);
+  await expect(cells.last()).toHaveAccessibleName('": flip character 4');
+  await cells.nth(2).click();
+  await expect(preview).toHaveText('👩‍#"');
+  await input.fill('');
+  await expect(preview).toHaveText('a');
+  await expect(panel).toContainText('empty text has no character to replace');
+});
+
+test('hex comparison toggles a single bit for every leading nibble and labels the empty case', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('#tab-sm3').click();
+  await page.selectOption('#sm3-mode', 'hex');
+  const panel = page.locator('#panel-sm3');
+  const input = page.locator('#sm3-input');
+  const preview = panel.locator('p').filter({ hasText: 'Modified input:' }).locator('code');
+  for (let i = 0; i < 16; i++) {
+    const hex = i.toString(16) + '5';
+    await input.fill(hex);
+    const changed = Number.parseInt(hex, 16) ^ Number.parseInt(await preview.innerText(), 16);
+    expect(changed).toBe(0x10);
+  }
+  await input.fill('');
+  await expect(preview).toHaveText('00');
+  await expect(panel).toContainText('adds one zero byte');
+});
+
+test('automatic text comparisons replace a whole trailing code point across the other digest panels', async ({ page }) => {
+  await page.goto('.');
+  for (const tab of ['streebog', 'kupyna', 'anchors']) {
+    await page.locator('#tab-' + tab).click();
+    const panel = page.locator('#panel-' + tab);
+    await page.locator('#' + tab + '-input').fill('A🦊');
+    await expect(panel.locator('p').filter({ hasText: 'Modified input' }).locator('code')).toHaveText('Aa');
+    if (tab !== 'anchors') {
+      const card = panel.locator('.card').filter({ has: page.locator('.avalanche-meter') }).last();
+      const algorithm = (await card.locator('strong').first().innerText()).trim();
+      const hashName = algorithm.toLowerCase().replace(/^sha-/, 'sha');
+      const expected = createHash(hashName).update('Aa', 'utf8').digest('hex');
+      await expect(card.locator('.digest-block').last()).toHaveText(expected);
+    }
+  }
 });

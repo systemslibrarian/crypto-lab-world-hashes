@@ -26,8 +26,8 @@ The page opens with a **ground-floor "what is a cryptographic hash?" panel** tha
 
 A ground-floor intro panel plus seven exhibits, one per tab. The seventh is a text-only standards panel:
 
-0. **What is a cryptographic hash?** — the four properties in plain language, demonstrated live: type anything and watch the SHA-256 digest stay a fixed 256 bits while one extra character scrambles it; a collapsible explains one-wayness and collisions.
-1. **SM3 (China)** with SHA-256 side-by-side, a labelled **Merkle–Damgård mechanism diagram** (message blocks chaining through a compression function to an exposed final state → length-extension), and a **user-driven avalanche** — click any character to flip it yourself and watch the digest re-scramble.
+0. **What is a cryptographic hash?** — compare two messages and count the changed SHA-256 bits. A disclosure explains preimage and collision resistance. [NIST hash function definitions](https://csrc.nist.gov/glossary/term/cryptographic_hash_function)
+1. **SM3 (China)** with SHA-256 side-by-side, a labelled **Merkle–Damgård mechanism diagram** (message blocks chaining through a compression function to an exposed final state → length-extension), and a **user-driven avalanche** — select a Unicode code point to replace in text mode, or toggle one bit automatically in a nonempty hex input.
 2. **Streebog (Russia)** with S-box controversy documentation and its wide-pipe MD construction glossed.
 3. **Kupyna (Ukraine)** with geopolitical context and a **wide-pipe mechanism diagram** (blocks chained through a double-width state, truncated by a final output transformation → no length-extension). Kupyna is a Grøstl-style wide-pipe Merkle–Damgård hash, *not* a sponge.
 4. **SHA-256 and SHA-3 as reference anchors** with seven-way simultaneous hashing (SHA-256, SHA-3-256, SM3, Streebog-256, Kupyna-256, Bash-256, LSH-256) and the **sponge mechanism diagram** (absorb into a wide rate/capacity state, squeeze out the digest, capacity never exposed → no length-extension). SHA-3 and **Bash (Belarus)** are the two sponges in the lab; everything else chains blocks.

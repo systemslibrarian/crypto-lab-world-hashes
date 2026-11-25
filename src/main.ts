@@ -177,17 +177,17 @@ function mutateInput(input: string, mode: InputMode): string {
     if (input.length === 0) {
       return 'a';
     }
-    const last = input[input.length - 1];
-    const next = last === 'a' ? 'b' : 'a';
-    return `${input.slice(0, -1)}${next}`;
+    const chars = Array.from(input);
+    const last = chars.length - 1;
+    chars[last] = chars[last] === 'a' ? 'b' : 'a';
+    return chars.join('');
   }
 
   const normalized = normalizeHex(input);
   if (normalized.length === 0) {
     return '00';
   }
-  const firstNibble = normalized[0];
-  const replacement = firstNibble === '0' ? '1' : '0';
+  const replacement = (Number.parseInt(normalized[0], 16) ^ 1).toString(16);
   return `${replacement}${normalized.slice(1)}`;
 }
 
@@ -201,17 +201,19 @@ function flipCharAt(input: string, index: number | null): { mutated: string; ind
   if (input.length === 0) {
     return { mutated: 'a', index: 0 };
   }
-  const i = index === null || index < 0 || index >= input.length ? input.length - 1 : index;
-  const c = input[i];
+  const chars = Array.from(input);
+  const i = index === null || index < 0 || index >= chars.length ? chars.length - 1 : index;
+  const c = chars[i];
   // Nudge to a visibly different, still-printable character. Letters toggle
   // case-ish (a<->b, others +1); everything else flips to '#'/'~'.
   const replacement = c === 'a' ? 'b' : c === 'A' ? 'B' : c === ' ' ? '_' : c === '#' ? '~' : '#';
-  return { mutated: `${input.slice(0, i)}${replacement}${input.slice(i + 1)}`, index: i };
+  chars[i] = replacement;
+  return { mutated: chars.join(''), index: i };
 }
 
 /**
  * A clickable strip of the input characters. Clicking a character selects it as
- * the single byte to flip; the currently-flipped one is marked. Keyboard users
+ * the Unicode code point to replace; the currently-flipped one is marked. Keyboard users
  * get real <button>s. This turns the avalanche from a pre-baked readout into
  * something the learner causes themselves.
  */
@@ -229,8 +231,8 @@ function flipStrip(input: string, flipIndex: number): string {
       const display = isSpace ? '' : escapeHtml(c);
       const selected = i === flipIndex;
       return `<button type="button" class="flip-cell${selected ? ' flip-cell-active' : ''}${isSpace ? ' flip-cell-space' : ''}"
-        data-flip-index="${i}" aria-pressed="${selected}"
-        aria-label="${isSpace ? 'Space' : c}: flip character ${i + 1}">${display}</button>`;
+        id="sm3-flip-${i}" data-flip-index="${i}" aria-pressed="${selected}"
+        aria-label="${isSpace ? 'Space' : escapeHtml(c)}: flip character ${i + 1}">${display}</button>`;
     })
     .join('');
   return `<div class="flip-strip" role="group" aria-label="Click a character to flip it">${cells}</div>`;
@@ -319,7 +321,7 @@ function avalancheCard(label: string, original: string, mutated: string, bits: n
         <span class="avalanche-ideal" aria-hidden="true"></span>
       </div>
       <p class="small muted">Changed bits: <strong>${changed}</strong> / ${bits}
-        (<strong>${pctText}%</strong> · ideal ≈ 50%)</p>
+        (<strong>${pctText}%</strong> · expected average ≈ 50%)</p>
     </div>
   `;
 }
@@ -452,8 +454,8 @@ function gloss(term: string, display?: string): string {
 
 /**
  * Exhibit 0 — the ground floor. Defines what a hash IS in plain language and
- * demonstrates all four properties live: the learner types anything and watches
- * the digest stay a fixed length while looking random and one-way. Every later
+ * lets the learner measure fixed length and diffusion. The accompanying text
+ * introduces the separate computational goals of preimage and collision resistance. Every later
  * exhibit is anchored to this baseline.
  */
 function renderIntroExhibit(): string {
@@ -477,17 +479,17 @@ function renderIntroExhibit(): string {
       </p>
       <div class="grid-2 prop-grid">
         <div class="prop-card"><span class="prop-tag">1 · Deterministic</span>
-          <p class="small">The same input always gives the same digest. Hash it twice, get the same fingerprint — that is how you verify a download.</p></div>
+          <p class="small">The same bytes always give the same digest. To verify a download, compare its digest with a trusted reference.</p></div>
         <div class="prop-card"><span class="prop-tag">2 · Fixed length</span>
           <p class="small">One byte or one gigabyte in, the digest is always the same size (256 bits here). The output length never grows with the input.</p></div>
         <div class="prop-card"><span class="prop-tag">3 · One-way</span>
-          <p class="small">Easy to go input → digest, infeasible to go back. Given a digest, you cannot recover the input — the fingerprint reveals nothing about it.</p></div>
+          <p class="small">Given a randomly chosen digest, finding an input that hashes to it should be computationally infeasible. A short list of possible inputs can still be checked against a digest.</p></div>
         <div class="prop-card"><span class="prop-tag">4 · Collision-resistant</span>
-          <p class="small">No one can find two different inputs with the same digest. That is what lets a digest stand in for the data it fingerprints.</p></div>
+          <p class="small">Finding two different inputs with the same digest should be computationally infeasible. Such pairs exist because the digest has a fixed size.</p></div>
       </div>
 
       <div class="intro-live">
-        <label for="intro-input">Try it — type anything and watch the four properties hold</label>
+        <label for="intro-input">Type a message to compare its SHA-256 digest before and after an edit</label>
         <textarea id="intro-input" rows="2" aria-describedby="intro-live-note">${escapeHtml(state.intro.input)}</textarea>
         <p id="intro-live-note" class="live-note"><span class="live-dot" aria-hidden="true"></span>Hashed live with SHA-256 in your browser.</p>
         <div class="card" role="status" aria-live="polite">
@@ -503,9 +505,8 @@ function renderIntroExhibit(): string {
           <div class="result-header"><strong>Now add one character:</strong> <code>${escapeHtml(nudged)}</code></div>
           <div class="digest-block">${diffDigestHtml(digest, nudgedDigest)}</div>
           <p class="small muted" style="margin:.4rem 0 0;">
-            One extra <code>!</code> scrambled <strong>${nudgedDiff}/256</strong> bits (${nudgedPct}%) — the digest looks
-            unrelated (one-wayness in action, property 3), yet re-typing the exact same text always returns the exact
-            same fingerprint (property 1).
+            Appending <code>!</code> changed <strong>${nudgedDiff}/256</strong> output bits (${nudgedPct}%) in this pair.
+            Restore the original bytes to get the original digest again.
           </p>
         </div>
       </div>
@@ -513,11 +514,9 @@ function renderIntroExhibit(): string {
       <details class="explainer">
         <summary>Why can't I just reverse it? (one-wayness &amp; collisions)</summary>
         <p class="small">
-          A 256-bit digest has 2<sup>256</sup> possible values — more than there are atoms in the observable universe.
-          Because the output is far smaller than the space of possible inputs, <em>collisions must exist</em> in theory,
-          but the security goal is that no one can <strong>find</strong> one, nor find any input that maps to a chosen
-          digest. Searching for a matching input by brute force would take longer than the age of the universe, which is
-          exactly why a digest can safely stand in for the data. That is the property every algorithm below is judged on.
+          SHA-256 has 2<sup>256</sup> possible digest values. More possible messages than digest values means
+          that some messages share a digest. This comparison measures how many output bits changed for these two
+          messages. Establishing preimage and collision resistance requires evidence beyond examples.
         </p>
       </details>
     </section>
@@ -810,10 +809,12 @@ function renderSm3Exhibit(): string {
     <div class="panel" style="margin-top: 1rem;">
       <h3>Avalanche demo — flip one character yourself</h3>
       <p class="small muted" style="max-width:72ch;">
-        A good hash makes a 1-bit input change and a completely different digest indistinguishable from random.
-        ${interactive
-          ? 'Click any character below to flip it, then watch which output nibbles re-scramble and how far the diffusion meter moves.'
-          : 'In hex mode the first nibble is flipped automatically; switch to Text mode to pick the character yourself.'}
+        The meter counts how many digest bits differ between the two inputs.
+        ${original.length === 0
+          ? (interactive ? 'The empty text has no character to replace. This comparison appends a.' : 'The empty input has no bit to flip. This comparison adds one zero byte (00).')
+          : (interactive
+            ? 'Choose one Unicode code point to replace. A displayed symbol may contain several code points, and their UTF-8 encodings can span several bytes.'
+            : 'The comparison toggles one bit in the first hexadecimal digit.')}
       </p>
       ${interactive ? flipStrip(state.sm3.input, flipIndex) : ''}
       <p class="small muted">Modified input: <code>${escapeHtml(mutatedInput)}</code> — <span class="nibble-changed">highlighted</span> nibbles differ from the original digest.</p>
@@ -888,7 +889,7 @@ function renderStreebogExhibit(): string {
     </div>
     <div class="panel" style="margin-top: 1rem;">
       <h3>Avalanche demo</h3>
-      <p class="small muted"><span class="nibble-changed">Highlighted</span> nibbles differ after a one-character input change.</p>
+      <p class="small muted">Modified input: <code>${escapeHtml(changedInput)}</code>. <span class="nibble-changed">Highlighted</span> digits differ between the two digests.</p>
       <div class="grid-2">
         ${avalancheCard(`Streebog-${currentSize}`, streebogDigest, streebogChanged, currentSize)}
         ${avalancheCard(currentSize === 256 ? 'SHA-256' : 'SHA-512', referenceDigest, referenceChanged, currentSize)}
@@ -967,7 +968,7 @@ function renderKupynaExhibit(): string {
     </div>
     <div class="panel" style="margin-top: 1rem;">
       <h3>Avalanche demo</h3>
-      <p class="small muted"><span class="nibble-changed">Highlighted</span> nibbles differ after a one-character input change.</p>
+      <p class="small muted">Modified input: <code>${escapeHtml(changedInput)}</code>. <span class="nibble-changed">Highlighted</span> digits differ between the two digests.</p>
       <div class="grid-2">
         ${avalancheCard(`Kupyna-${currentSize}`, kupynaDigest, kupynaChanged, currentSize)}
         ${avalancheCard(currentSize === 256 ? 'SHA-3-256' : 'SHA-3-512', sha3Digest, sha3Changed, currentSize)}
@@ -1383,7 +1384,7 @@ function renderAnchorsExhibit(): string {
     <div class="grid-2" style="margin-top: 1rem;">${outputCards}</div>
     <div class="panel" style="margin-top: 1rem;">
       <h3>Seven-way avalanche snapshot</h3>
-      <p class="small muted">Modified input used for comparison: <code>${escapeHtml(changedInput)}</code> — a strong hash flips close to 50% of output bits.</p>
+      <p class="small muted">Modified input used for comparison: <code>${escapeHtml(changedInput)}</code> — about half the digest bits are expected to change on average across many pairs.</p>
       <!-- role + tabindex, not just overflow-x. Below 860px .comparison-table
            takes min-width:700px, so this wrapper scrolls and holds nothing
            focusable - a WCAG 2.1.1 failure that only exists at phone width, and
@@ -1718,7 +1719,7 @@ function render(): void {
           <h1 class="cl-hero-title">World Hashes</h1>
           <p class="cl-hero-sub">SM3 · Streebog · Kupyna · Bash · LSH · SHA-256 · SHA-3</p>
           <p class="cl-hero-desc">
-            Hash the same input with five national standards and the SHA anchors side by side, and watch the avalanche effect flip half the output bits from a one-bit change.
+            Hash the same input with five national standards and the SHA anchors side by side, and measure how many output bits change when you edit the input.
           </p>
           <div class="hero-badges">
             <span class="badge">National Hash Standards</span>
