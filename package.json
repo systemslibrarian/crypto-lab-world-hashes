@@ -31,16 +31,16 @@
     "@li0ard/kupyna": "^0.1.4",
     "@li0ard/streebog": "^0.2.6",
     "@noble/hashes": "^2.4.0",
-    "sm-crypto": "^0.5.8"
+    "sm-crypto": "^0.5.9"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.65.1",
-    "axe-core": "^4.14.0",
+    "axe-core": "^4.14.1",
     "happy-dom": "^21.0.4",
     "typescript": "^5.6.3",
     "vite": "^8.3.8",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   },
   "allowScripts": {
     "esbuild@0.27.7": true
